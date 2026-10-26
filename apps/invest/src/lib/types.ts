@@ -11,7 +11,7 @@ export type Budget = {
   incompleteStreams: { id: number; name: string; reason: string }[];
   cashConfirmation: { amount: string; asOf: string; version: number; valid: boolean } | null;
   freeCash: string | null; usedQuota: string; goalSavingUsage: string; reservations: string; remainingQuota: string; cashDeficit: string;
-  availableToAllocate: string | null; canEvaluate: false; events: PaymentEvent[];
+  availableToAllocate: string | null; canEvaluate: boolean; events: PaymentEvent[];
   receiptCount: number; receipts: { id: number; amount: string; description: string; receivedAt: string; streamId: number | null; linked: boolean }[];
 };
 export type InvestStatus = { enabled: boolean; phase: string; ruleset: string; capabilities: Record<string, boolean>; coverage: Record<string, string> };

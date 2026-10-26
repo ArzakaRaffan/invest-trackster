@@ -6,7 +6,7 @@ import { usePreferences } from './InvestProvider';
 
 export const moneyPattern = '(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?';
 export const precisePattern = '(0|[1-9][0-9]{0,15})(\\.[0-9]{1,12})?';
-export function useInvestWrite(revision: string, done: () => void) {
+export function useInvestWrite<T = unknown>(revision: string, done: (result?: T) => void) {
   const { t } = usePreferences();
   const { mutate } = useSWRConfig();
   const baseline = useRef(revision);
@@ -19,10 +19,10 @@ export function useInvestWrite(revision: string, done: () => void) {
     if (!pending.current) pending.current = { path, method, body: { ...body, expectedRevision: baseline.current, idempotencyKey: crypto.randomUUID() } };
     try {
       const p = pending.current;
-      await api[p.method](p.path, p.body);
+      const result = await api[p.method]<T>(p.path, p.body);
       // A completed write must not be reported as failed merely because the refresh fails.
       void mutate(key => typeof key === 'string' && key.startsWith('/invest/')).catch(() => {});
-      pending.current = null; setUncertain(false); done();
+      pending.current = null; setUncertain(false); done(result);
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 409) { setConflict(true); setError(t('Data berubah. Isian tetap di sini. Tutup formulir lalu periksa data terbaru sebelum mencoba lagi.', 'Data changed. Your input is still here. Close this form and review the latest data before retrying.')); void mutate('/invest/portfolio'); }

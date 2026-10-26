@@ -1,2 +1,2 @@
-import { Readiness } from '@/components/Readiness';
-export default function Reviews() { return <Readiness area="reviews" />; }
+import { EvaluationHistory } from '@/components/InvestEvaluation';
+export default function Reviews() { return <EvaluationHistory />; }

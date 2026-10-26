@@ -1,2 +1,2 @@
-import { Readiness } from '@/components/Readiness';
-export default function Sources() { return <Readiness area="sources" />; }
+import { InvestMarket } from '@/components/InvestMarket';
+export default function Sources() { return <InvestMarket sourcesOnly />; }

@@ -1,0 +1,110 @@
+// Run after the guarded synthetic API harness; uses invest_test_b (no real account data).
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import { marketFacts, marketAnswers } from '../../backend/scripts/invest-market-fixture.mjs';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {}) });
+const context = await browser.newContext({ viewport: { width: 1400, height: 1000 }, reducedMotion: 'reduce' });
+const admin = await browser.newContext();
+const page = await context.newPage(), faults = [];
+page.on('pageerror', e => faults.push(String(e)));
+page.on('response', r => { if (r.status() >= 500 && r.url().startsWith('http://localhost:')) faults.push(`${r.status()} ${r.url()}`); });
+const origin = { Origin: 'http://localhost:3001' };
+let checks = 0;
+const eq = (a,b,label) => { assert.deepEqual(a,b,label); checks++; };
+const get = async (ctx = context) => (await ctx.request.get('http://localhost:4000/invest/portfolio')).json();
+const write = async (ctx, path, payload, method = 'POST') => {
+  const state = await get(ctx);
+  const r = await ctx.request.fetch('http://localhost:4000'+path, { method, headers: origin, data: { expectedRevision: state.revision, idempotencyKey: randomUUID(), ...payload } });
+  assert.ok(r.ok(), `${method} ${path}: ${r.status()} ${await r.text()}`); checks++; return r.json();
+};
+const eventually = async (fn, label) => { for(let n=0;n<80;n++){if(await fn()){checks++;return;}await page.waitForTimeout(100);}throw new Error(label); };
+const dialog = page.getByRole('dialog');
+await mkdir('.artifacts', { recursive: true });
+try {
+  await page.goto('http://localhost:3001/login');
+  await page.getByLabel('Username', { exact: true }).fill('invest_test_b');
+  await page.locator('input[autocomplete="current-password"]').fill('synthetic-invest-only');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click(); await page.waitForURL('**/app');
+  eq((await get()).goals.length, 0, 'fresh synthetic member fixture');
+  const login = await admin.request.post('http://localhost:4000/auth/login', { headers: origin, data: { username: 'invest_test_a', password: 'synthetic-invest-only' } }); eq(login.status(),201,'synthetic catalog curator');
+  const month = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit'}).format(new Date());
+  const goal = await write(context, '/invest/goals', { name:'Synthetic browser I3 goal', needDate:`${Number(month.slice(0,4))+12}-12-31`, liquidityDays:7, status:'ACTIVE', holdingsDeclaration:'EMPTY' });
+  await write(context, `/invest/goals/${goal.id}/profile`, { answers:marketAnswers, confirmed:true, conflictsAcknowledged:false, expectedVersion:0 }, 'PUT');
+  const s = await get(); eq((await context.request.put('http://localhost:4000/invest/cash-confirmation', { headers:origin, data:{month, amountIDR:'10000.01', confirmed:true, expectedRevision:s.budget.revision} })).status(),200,'synthetic cash ready');
+  await page.goto('http://localhost:3001/app/market');
+  await page.getByRole('heading',{name:'Schroder Dana Likuid',exact:true}).waitFor();
+  eq(await page.getByRole('button',{name:'Kelola catatan',exact:true}).count(),0,'member has no catalog write UI');
+  eq(await page.getByTestId('market-instrument').count(),3,'sourced research catalog available without fixture prices');
+  await page.setViewportSize({width:390,height:844});
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'research catalog fits mobile');
+  await page.screenshot({path:'.artifacts/i3-market-mobile-dark.png',fullPage:true});
+  await page.goto('http://localhost:3001/app/plan');
+  await page.getByRole('button',{name:'Evaluasi tujuan',exact:true}).click();
+  let cut = false;
+  await page.route('**/invest/evaluations', async route => {
+    if (!cut && route.request().method()==='POST'){cut=true; const response=await route.fetch();eq(response.status(),201,'evaluation committed before lost response');await route.abort('failed');}
+    else await route.continue();
+  });
+  await dialog.getByRole('button',{name:'Hitung dan simpan evaluasi',exact:true}).click();
+  await dialog.getByRole('button',{name:'Ulangi kiriman',exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'Ulangi kiriman',exact:true}).click();
+  await page.waitForURL('**/app/reviews/*');
+  await page.getByTestId('evaluation-status').getByText('Nominal ditahan',{exact:true}).waitFor();
+  eq(await page.getByRole('button',{name:'Cadangkan rencana',exact:true}).count(),0,'research cannot reserve from UI');
+  const withheldId = page.url().split('/').at(-1);
+  eq((await (await context.request.get('http://localhost:4000/invest/evaluations')).json()).items.length,1,'lost response retry creates one immutable snapshot');
+  const before = (await (await context.request.get(`http://localhost:4000/invest/evaluations/${withheldId}`)).json()).result;
+  const fixtureIds=['synthetic-browser-bond','synthetic-browser-equity','synthetic-browser-equity-alternative'];
+  for(const [index,id] of fixtureIds.entries()) { const facts = marketFacts(index===0?'BONDS':'EQUITY'); if(index===2) { facts.name='Synthetic equity alternative'; facts.fees.ongoingAnnual='0.002'; } await write(admin,'/invest/catalog/instruments',{instrumentId:id,expectedVersion:0,facts}); }
+  await page.goto('http://localhost:3001/app/market');
+  for(const name of ['Synthetic BONDS test fund','Synthetic EQUITY test fund','Synthetic equity alternative']) {
+    const card = page.getByTestId('market-instrument').filter({has:page.getByRole('heading',{name,exact:true})});
+    await card.getByRole('button',{name:'Periksa akses saya',exact:true}).click();
+    await dialog.getByRole('combobox').selectOption('ACTIVE');
+    await dialog.getByRole('checkbox').first().check();
+    await dialog.getByRole('button',{name:'Simpan',exact:true}).click();
+    await dialog.waitFor({state:'hidden'});
+    await card.getByText('Lolos pemeriksaan data',{exact:true}).waitFor(); checks++;
+  }
+  await page.goto('http://localhost:3001/app/plan');
+  await page.getByRole('button',{name:'Evaluasi tujuan',exact:true}).click();
+  await dialog.getByRole('button',{name:'Hitung dan simpan evaluasi',exact:true}).click();
+  await page.waitForURL('**/app/reviews/*');
+  await page.getByTestId('evaluation-status').getByText('Siap ditinjau',{exact:true}).waitFor();
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'evaluation mobile fits');
+  await page.screenshot({path:'.artifacts/i3-evaluation-mobile-dark.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:1000});await page.screenshot({path:'.artifacts/i3-evaluation-desktop-dark.png',fullPage:true});
+  const defaultId=page.url().split('/').at(-1);
+  await page.locator('article').filter({has:page.getByText('Synthetic equity alternative',{exact:true})}).getByRole('button',{name:'Pilih alternatif',exact:true}).click();
+  await dialog.getByRole('button',{name:'Evaluasi pilihan',exact:true}).click();
+  await page.waitForURL(url => url.pathname.startsWith('/app/reviews/') && !url.pathname.endsWith(defaultId));
+  await page.getByTestId('evaluation-status').getByText('Siap ditinjau',{exact:true}).waitFor();
+  const evaluationId=page.url().split('/').at(-1);
+  const selected=(await (await context.request.get(`http://localhost:4000/invest/evaluations/${evaluationId}`)).json());
+  eq(selected.result.orders.filter(o=>o.assetClass==='EQUITY').map(o=>o.instrumentId),[fixtureIds[2]],'alternative replaces one core candidate in a new snapshot');
+  await page.getByRole('button',{name:'Cadangkan rencana',exact:true}).click();
+  await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Cadangkan',exact:true}).click();
+  await eventually(async()=> (await get()).budget.reservations==='10000.01','contribution reserved once');
+  await page.getByRole('button',{name:'Catat realisasi',exact:true}).click();
+  await dialog.getByLabel('Catatan bukti realisasi',{exact:true}).fill('Synthetic browser purchase and cash separation');
+  await dialog.getByRole('checkbox').nth(0).check();await dialog.getByRole('checkbox').nth(1).check();
+  await dialog.getByRole('button',{name:'Simpan realisasi',exact:true}).click();
+  await eventually(async()=> (await get()).reservations.some(r=>r.effectiveStatus==='SETTLED'),'realization persisted');
+  const settled=await get();eq(settled.budget.reservations,'0.00','settlement removes reserve');eq(settled.budget.freeCash,'0.00','contribution consumed once');eq(settled.ledger.length,3,'two purchases plus explicit cash saving');
+  const old=(await (await context.request.get(`http://localhost:4000/invest/evaluations/${withheldId}`)).json());eq(old.result,before,'earlier withheld archive unchanged');eq(old.stale,true,'earlier archive marks changed input');
+  await page.goto('http://localhost:3001/app/reviews');
+  await page.locator('.archive-row').first().waitFor();
+  eq(await page.locator('.archive-row').count(),3,'all snapshots visible in history');
+  await page.goto('http://localhost:3001/app/menu');await page.getByRole('button',{name:'Lega',exact:true}).click();await page.getByRole('button',{name:'Gelap',exact:true}).last().click();await page.getByRole('button',{name:'Indonesia',exact:true}).click();
+  await page.goto(`http://localhost:3001/app/reviews/${evaluationId}`);await page.getByRole('heading',{name:'Allocation with evidence.',exact:true}).waitFor();await page.getByTestId('evaluation-status').waitFor();await page.evaluate(()=>document.fonts.ready);
+  await page.setViewportSize({width:390,height:844});eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'light compact English evaluation fits mobile');
+  await page.screenshot({path:'.artifacts/i3-evaluation-mobile-light-en.png',fullPage:true});
+  await page.goto('http://localhost:3001/app/sources');await page.getByRole('heading',{name:'Data sources',exact:true}).waitFor();await page.locator('.source-record a').first().waitFor();eq(await page.locator('.source-record a').count()>=4,true,'sources remain linked in English');
+  eq(faults,[],'no browser runtime errors or local5xx');
+  console.log(`PASS: ${checks} I3 browser assertions; catalog, source/access privacy, immutable/retried evaluation, reserve/settle, history and responsive ID/EN.`);
+} catch(error){await page.screenshot({path:'.artifacts/i3-browser-failure.png',fullPage:true}).catch(()=>{});throw error;}
+finally{await browser.close();}

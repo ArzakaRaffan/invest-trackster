@@ -1,2 +1,2 @@
-import { Readiness } from '@/components/Readiness';
-export default function Market() { return <Readiness area="market" />; }
+import { InvestMarket } from '@/components/InvestMarket';
+export default function Market() { return <InvestMarket />; }
