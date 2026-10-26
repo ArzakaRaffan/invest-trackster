@@ -2,7 +2,7 @@
 
 Website investasi dengan akun, backend, dan sistem desain v3 Trackster bersama. Invest memakai jatah **20% bulanan** dari rencana 50/30/20: jatah aktual dari pemasukan yang sudah diterima dan rencana jatah dari forecast ditampilkan terpisah.
 
-**Status 26 Oktober 2026:** fondasi, anggaran bulanan, tujuan/profil risiko, dan portofolio manual tersedia untuk dijalankan lokal. I3 menyediakan katalog/detail/filter/perbandingan bersumber, alokasi/stress/ranking, pilihan alternatif, arsip evaluasi dan reserve→settle manual. Review I4 menampilkan perubahan serta deviasi pot dan mencatat peninjauan tanpa transaksi. Katalog nyata awal masih riset; AI, kalibrasi/pilot dan release belum selesai. Status serta bukti pengujian ada di [catatan implementasi](docs/invest/06-Implementation.md); ini belum merupakan rilis produksi lengkap.
+**Status 26 Oktober 2026:** fondasi, anggaran bulanan, tujuan/profil risiko, dan portofolio manual tersedia untuk dijalankan lokal. I3 menyediakan katalog/detail/filter/perbandingan bersumber, alokasi/stress/ranking, pilihan alternatif, arsip evaluasi dan reserve→settle manual. Review I4 menampilkan perubahan serta deviasi pot dan mencatat peninjauan tanpa transaksi. Penjelasan evaluasi bersumber dan fallback tersedia; bantuan AI terbatas masih default off. Katalog nyata awal masih riset; uji model nyata, kalibrasi/pilot dan release belum selesai. Status serta bukti pengujian ada di [catatan implementasi](docs/invest/06-Implementation.md); ini belum merupakan rilis produksi lengkap.
 
 ## Isi repository
 

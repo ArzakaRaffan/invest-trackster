@@ -73,6 +73,8 @@ Untuk perubahan berikutnya, catat ID, status lama/baru, keputusan pengguna beser
 
 ## Pelaksanaan setelah persetujuan
 
+2026-10-26 (penjelasan I4): Arzaka meminta "lanjuuuuuuttttt, langsung push aja abis ngerjain". Penjelasan hasil dan adapter bantuan AI terbatas dibangun serta diuji dengan provider sintetis; tidak mengubah D1–D12 atau menyatakan AC-AI1 model nyata sudah lulus. Flag AI default off; tidak ada deployment. Batas implementasi dan kelanjutan di [10](10-Explanation-Research.md), bukti pengujian di [06](06-Implementation.md).
+
 2026-10-26 (lanjutan): instruksi Arzaka "lanjut yaa" meneruskan pembangunan lokal ke profil/tujuan dan portofolio manual I2. Tidak mengubah parameter M1–M7 atau D1–D12. Create/settle reservasi membutuhkan evaluation ACTUAL I3; tidak dibuka dengan nominal dari klien sebagai jalan pintas. Detail implementasi dan gap ada di [06](06-Implementation.md).
 
 2026-10-26: Arzaka meminta mulai membangun berdasarkan PRD. Implementasi lokal I0/I1 dimulai pada branch `feat/invest-foundation`; [status dan bukti](06-Implementation.md). D1–D12 tidak berubah. Permintaan membangun tidak diperlakukan sebagai persetujuan deployment produksi atau sebagai kelulusan metode investasi.

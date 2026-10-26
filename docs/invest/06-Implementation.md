@@ -2,6 +2,38 @@
 
 [PRD](PRD.md) · [Keputusan](00-Decisions.md) · [Metode](04-Methodology.md) · [Menjalankan lokal](../../apps/invest/README.md)
 
+## 2026-10-26 — Penjelasan evaluasi dan bantuan AI terbatas
+
+Permintaan Arzaka: lanjutkan pekerjaan dan langsung push ke repository Invest setelah selesai. Branch `feat/invest-explanations`, baseline `aba1a64`. D1–D12 dan `invest-method-v0.1` tidak berubah. Riset serta batas kontrak ada di [10-Explanation-Research.md](10-Explanation-Research.md).
+
+### Hasil yang tersedia
+
+- Halaman detail evaluasi mempunyai **Alasan hasil ini**: dasar nominal aktual/forecast, target pot, skenario risiko, aturan ranking, posisi kandidat pilihan termasuk alternatif, nominal/biaya, sumber dan batas cakupan. Teks ID/EN dan angka berasal dari snapshot server; unknown tetap kosong. Indikator stale tetap terlihat.
+- Penjelasan aturan tersedia tanpa AI. Bantuan AI bersifat opsional dan eksperimental: memilih `brief/detail` untuk klaim server; tidak menulis teks bebas, mengubah angka/urutan/sumber, membuat transaksi atau membuka gate. Tidak ada panggilan model saat membuka halaman.
+- UI memakai card, badge, notice, details, tombol dan token v3 bersama. Loading/error, retry, kuota, cooldown serta pemulihan respons hilang bekerja. Hasil tersimpan terbaca lagi setelah reload dan terpisah per bahasa.
+
+### API, privasi dan penyimpanan
+
+GET `/invest/evaluations/:id/explanation?language=id|en` membaca penjelasan/fallback, tanpa kuota. POST rute yang sama menerima hanya `{language}`. JWT/access/body validation/ownership berjalan sebelum quota berbayar; milik user lain404. `InvestExplanationQuotaGuard` memakai batas per menit dan `AiUsage` harian yang sudah ada. Cache replay dan default off tidak memakan kuota. HTTP429 lokal tidak menghilangkan GET penjelasan; HTTP429 provider menjadi fallback dengan reason aman.
+
+Tidak ada migrasi. `InvestMutation` menyimpan artifact privat per evaluation/version/bahasa dengan lease token. Unique constraint dan compare-and-swap menjaga satu provider call saat bersamaan; provider berada di luar transaksi DB. Lease dan cooldown60detik; sukses dibaca ulang, retry kegagalan harus eksplisit setelah cooldown. Isi yang disimpan hanya pilihan terverifikasi/outcome, bukan respons model mentah. Tidak menulis ulang evaluation, ledger, holdings, reservasi, Income atau saldo bank; revision uang tidak berubah.
+
+Adapter terpisah memakai konfigurasi `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL_FAST` (fallback `AI_MODEL`) melalui protokol kompatibel yang sudah digunakan Trackster. Timeout12detik, maksimum respons32KiB, non-streaming, tanpa redirect/retry otomatis/log body. Paket input hanya klaim/varian/ID sumber lokal; tidak memuat nama/ID akun, nominal, jawaban profil, transaksi, holdings, URL atau prosa sumber. Validator menolak field tambahan, klaim/sumber asing, urutan berubah, omit/duplicate, refusal, tool call dan hasil terpotong. JSON valid saja tidak cukup.
+
+**Env baru:** `INVEST_AI_ENABLED=false`. Biarkan off sampai uji model nyata dan kebijakan provider untuk pilot selesai. Config belum lengkap tetap fallback; config tidak diteruskan ke frontend. `capabilities.explanations=true`, `ai` mengikuti config eksplisit; phase tetap I3 karena seluruh acceptance I4 belum selesai. Tidak mengubah konfigurasi/deployment Trackster.
+
+### Bukti pemeriksaan sesi ini
+
+- Backend build cap1536MB, Invest production build/typecheck, frontend Trackster `tsc --noEmit` lulus. **6/6 check Invest** lulus; helper/adapter penjelasan **327 assertion**, termasuk semua256 kombinasi varian pada fixture, decimal besar, unknown, source permissions, payload injection, output malformed, timeout dan error provider. Audit tenancy **0 temuan**.
+- **322 assertion API** lulus pada database PostgreSQL17 loopback baru dengan48 migrasi yang sudah ada. Termasuk56 pemeriksaan tambahan penjelasan: auth/access/ownership, input palsu, quota, request bersamaan, cache bahasa, failure/cooldown, pemulihan lease, arsip dan financial revision tetap identik. Provider HTTP sintetis berada di loopback; tidak memanggil vendor atau data akun asli.
+- **46 assertion browser pasar/review**, **22 assertion browser penjelasan**, dan **13 pemeriksaan visual read-only** lulus pada build produksi lokal. Browser penjelasan memakai HTTP fixture provider lewat adapter sebenarnya; unsupported response/provider429 diuji, local429 disimulasikan pada jaringan browser (guard quota diuji nyata pada suite API). Respons sengaja diputus setelah hasil disimpan; GET memulihkan hasil tanpa perubahan uang.
+- Screenshot mobile390 tema gelap/terang dan ID/EN diperiksa; tidak ada overflow, exception browser, atau5xx. Script browser mengambil detail evaluasi terlebih dahulu karena endpoint daftar hanya mengembalikan ringkasan. Screenshot `.artifacts/` tidak di-commit.
+- Windows Node22.12.0; image Node24/Docker dan production tidak diuji. Server API/Invest, fixture provider serta PostgreSQL uji sudah dihentikan; port3000/3001/4000/55439/provider tertutup.
+
+### Batas dan langkah berikutnya
+
+AC-AI1 model nyata masih terbuka: belum ada repeated prompts pada model vendor, pengukuran kegunaan editorial/latency/biaya, atau konfirmasi retensi provider. Ini penjelasan terstruktur yang dibantu AI, bukan chat investasi bebas. AC-AI2 lokal telah diperiksa pada fixture; jangan menyamakannya dengan pilot. Data catalog nyata/rights/fees/history, kalibrasi, UX pilot, receipt lintas bulan dan arsip profil tetap agenda berikutnya. Tidak ada deploy dalam sesi ini.
+
 ## 2026-10-26 — Detail/perbandingan pasar dan review I4
 
 **Otorisasi:** Arzaka meminta melanjutkan lagi. Branch kerja `feat/invest-market-review`, baseline `b6fe0fa` di repository Invest terpisah. D12, anggaran bulanan20% dan pemisahan PLAN/ACTUAL tetap. Riset primer dan batas penerapan ada di [09-Review-Research.md](09-Review-Research.md).

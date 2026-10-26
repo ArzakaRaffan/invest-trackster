@@ -1,7 +1,7 @@
 # PRD — Invest Trackster v1
 
 > **Status: siap untuk memulai pembangunan lokal.** Metode `invest-method-v0.1` disetujui Arzaka pada **2026-10-13** (D12).
-> **Pembaruan 2026-10-26:** implementasi lokal I0/I1 serta tujuan/profil/portofolio manual I2 sudah tersedia; [status dan bukti](06-Implementation.md). Inti I3 catalog/alokasi/ranking/snapshot serta create/settle reservasi kini tersedia lokal. Detail/filter/perbandingan catalog dan review perubahan pot/acknowledgment kini tersedia. Narasi AI, data nyata/pilot, serta deployment belum selesai. Kesiapan spesifikasi tidak berarti produk lengkap sudah lolos acceptance.
+> **Pembaruan 2026-10-26:** implementasi lokal I0/I1 serta tujuan/profil/portofolio manual I2 sudah tersedia; [status dan bukti](06-Implementation.md). Inti I3 catalog/alokasi/ranking/snapshot serta create/settle reservasi kini tersedia lokal. Detail/filter/perbandingan catalog dan review perubahan pot/acknowledgment kini tersedia. Penjelasan aturan serta adapter bantuan AI terbatas tersedia lokal; AI default off. Uji model nyata, data nyata/pilot, serta deployment belum selesai. Kesiapan spesifikasi tidak berarti produk lengkap sudah lolos acceptance.
 > **Pemilik produk/keputusan:** Arzaka. Domain/hosting O9 dan gate data/pilot/release tetap diselesaikan sebelum peluncuran terkait.
 
 [Keputusan](00-Decisions.md) · [Metode yang disepakati](04-Methodology.md) · [Bukti penelitian](05-Validation-Results.md) · [Data dan kode](02-Data-and-Integration.md) · [Riset](01-Investment-Research.md)
@@ -160,7 +160,8 @@ Money memakai Decimal dengan kapasitas agregat bulan yang cukup, minimal 18,2 un
 | `POST /invest/catalog/instruments`, `PATCH /invest/catalog/instruments/:id`, `POST /invest/catalog/instruments/:id/observations` | Write instrument/observation manual dengan source refs, rights dan review; khusus pengguna catalog berwenang, schema allowlist. |
 | `POST /invest/evaluations`, `GET /invest/evaluations/:id` | month, goalId, mode PLAN/ACTUAL, inputRevision; balas snapshot/result/status. PLAN tidak mengizinkan reserve/settle. |
 | `POST /invest/reservations`, `DELETE /invest/reservations/:id` | evaluationId/selected candidates/version, TTL24h; cap/source dievaluasi ulang. Cancel idempotent. |
-| `POST /invest/evaluations/:id/explanation` | Narrative request untuk result server yang dimiliki user; AI quota/fallback, tidak menerima angka authoritative dari klien. |
+| `GET /invest/evaluations/:id/explanation?language=id` | Penjelasan aturan/cache privat untuk snapshot; tidak memanggil model atau memakai kuota. Bahasa id/en. |
+| `POST /invest/evaluations/:id/explanation` | Request bantuan AI untuk result server milik user; body hanya language id/en. Quota/fallback/cache privat, tidak menerima angka authoritative dari klien. |
 | `GET /invest/reviews`, `POST /invest/reviews/:id/acknowledge` | Arsip/diff/ack review; acknowledge bukan transaksi. |
 
 Catalog writers adalah account berakses Invest yang mempunyai kewenangan ADMIN server-side; akses v1 saja tidak cukup. User biasa tidak dapat menaikkan status source menjadi reviewed/licensed dari body request. Riwayat review mencatat actor, perubahan/version dan bukti hak pakai; review tidak mengubah source facts lama secara diam-diam.
@@ -171,7 +172,7 @@ Shared errors: 400 input malformed; 401 sesi invalid; 403 akses v1/catalog denie
 
 ## 10. AI, privasi, dan sesi bersama
 
-Perhitungan, gate, fitur/skor/urutan dan nominal berasal dari engine deterministik. AI menjelaskan hasil dan membandingkan fakta yang disediakan; tidak menentukan bobot atau membuat sumber baru. Render angka/kartu dari result server, pisahkan narasi. Validasi field/source IDs dan klaim narasi; hasil invalid →template ruleset, dengan alasan kegagalan internal yang tidak membocorkan source pribadi. Tes model nyata diperlukan sebelum fitur AI enabled pada pilot.
+Perhitungan, gate, fitur/skor/urutan dan nominal berasal dari engine deterministik. AI menjelaskan hasil dan membandingkan fakta yang disediakan; tidak menentukan bobot atau membuat sumber baru. Render angka/kartu dari result server, pisahkan narasi. Validasi field/source IDs dan klaim narasi; hasil invalid →template ruleset, dengan alasan kegagalan internal yang tidak membocorkan source pribadi. Tes model nyata diperlukan sebelum fitur AI enabled pada pilot. Implementasi lokal v0.1 memakai narasi dari pilihan kalimat server: AI memilih varian untuk klaim wajib, sedangkan angka/sumber tetap berasal dari arsip. Tidak ada chat atau teks model bebas; input AI diminimalkan hingga klaim/varian/ID sumber lokal tanpa nominal maupun identitas. Rincian, batas dan status acceptance: [10-Explanation-Research.md](10-Explanation-Research.md).
 
 Pasang JwtAuthGuard sebelum akses Invest dan AiRateLimitGuard pada rute berbayar. UserId dari CurrentUser; query/body tidak dapat memilih identitas. Batasi v1 ke user IDs yang dipilih secara eksplisit melalui konfigurasi server, default deny jika belum dikonfigurasi; jangan mengandalkan hardcode ID=1 atau fallback owner yang dapat memilih akun lain. Akun awal ditentukan pada environment pilot, tanpa mempublikasikan nilai pribadi.
 

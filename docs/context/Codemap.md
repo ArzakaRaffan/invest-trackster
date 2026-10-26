@@ -4,6 +4,7 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 
 ## Invest — tambahan lokal 2026-10-26
 
+- Penjelasan I4: `invest-explanation.ts` membentuk klaim/fakta dan memvalidasi pilihan kalimat; controller/service/provider terpisah untuk GET/POST penjelasan milik user. Kuota AiUsage, artifact/lease privat InvestMutation, default off `INVEST_AI_ENABLED`. `InvestExplanation.tsx` pada detail evaluasi memakai UI v3. QA: helper327 assertion, `scripts/invest-explanation-e2e.mjs`, fixture HTTP lokal dan `apps/invest/scripts/explanation-browser-check.mjs`; lihat `docs/invest/10-Explanation-Research.md`.
 - Kelanjutan I3/I4: `invest-review.ts` menghitung diff, drift Decimal5pp, rollover WIB dan reviewKey; `invest-market.service.ts/controller.ts` menambah compare/filter/reviews/ack. Acknowledgment memakai audit `InvestChange`, tidak masuk portfolio revision. Tidak ada migrasi baru.
 - UI: `InstrumentDetails.tsx`, `/app/market/[id]`, `/app/market/compare` dan `InvestReviews.tsx` pada arsip/detail evaluasi. QA tambahan `invest-review.check.ts`, `scripts/invest-review-e2e.mjs`, alur detail/filter/compare/ack pada `market-browser-check.mjs`. Baca `docs/invest/09-Review-Research.md`.
 

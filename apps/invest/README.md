@@ -1,6 +1,6 @@
 # Invest — frontend Trackster
 
-Implementasi lokal tahap I0/I1 serta inti I2/I3 dari [PRD](../../docs/invest/PRD.md). Beranda/Rencana menampilkan jatah bulanan aktual dan forecast, konfirmasi kas bebas, serta rekonsiliasi receipt. Wizard `/setup` menyimpan tujuan/profil/knowledge; Portofolio menyimpan kepemilikan awal, valuasi, pergerakan, dan koreksi. Rencana menampilkan T/C/H serta jatah setelah pemakaian. Pasar/Sumber memuat catatan bersumber dan akses privat. Rencana dapat menghitung alokasi, stress dan ranking; `/app/reviews/:id` menyimpan hasil, alternatif, bukti, reservasi dan realisasi. Katalog nyata awal masih riset sehingga tidak menghasilkan nominal pembelian. Detail/filter/perbandingan dan review berkala deterministik sudah aktif. Narasi AI belum diaktifkan.
+Implementasi lokal tahap I0/I1 serta inti I2/I3 dari [PRD](../../docs/invest/PRD.md). Beranda/Rencana menampilkan jatah bulanan aktual dan forecast, konfirmasi kas bebas, serta rekonsiliasi receipt. Wizard `/setup` menyimpan tujuan/profil/knowledge; Portofolio menyimpan kepemilikan awal, valuasi, pergerakan, dan koreksi. Rencana menampilkan T/C/H serta jatah setelah pemakaian. Pasar/Sumber memuat catatan bersumber dan akses privat. Rencana dapat menghitung alokasi, stress dan ranking; `/app/reviews/:id` menyimpan hasil, alternatif, bukti, reservasi dan realisasi. Katalog nyata awal masih riset sehingga tidak menghasilkan nominal pembelian. Detail/filter/perbandingan dan review berkala deterministik sudah aktif. Penjelasan aturan bersumber tersedia; bantuan AI terbatas default off dan masih membutuhkan uji model nyata.
 
 ## Menjalankan lokal
 
@@ -21,7 +21,7 @@ Jatah aktual memakai `Income.status=CONFIRMED` menurut `receivedAt` dalam bulan 
 - Transport API: `../frontend/src/lib/api.ts`; cookie httpOnly, SWR, dan perilaku sesi habis sama.
 - `src/app/invest.css` hanya mengatur konten domain Invest. Geometri struk/angka utama mengikuti hero v3. Tidak ada Tailwind preflight.
 
-Sidebar **Tanya Track** membuka assistant Trackster. Invest belum mengaktifkan AI rekomendasi. Preferensi tema/bahasa/density disimpan pada origin Invest; tidak diasumsikan tersinkron lintas domain.
+Sidebar **Tanya Track** membuka assistant Trackster. Bantuan penjelasan Invest ada di detail evaluasi dan tidak menghitung rekomendasi; aktif hanya melalui konfigurasi backend eksplisit setelah acceptance model nyata. Preferensi tema/bahasa/density disimpan pada origin Invest; tidak diasumsikan tersinkron lintas domain.
 
 ## Verifikasi
 
@@ -29,7 +29,7 @@ Sidebar **Tanya Track** membuka assistant Trackster. Invest belum mengaktifkan A
 
 Tes DB/API: buat database PostgreSQL **kosong** bernama `invest_test_<suffix>` di loopback, migrasikan dengan CLI Prisma, lalu set `INVEST_TEST_DATABASE_URL` ke database tersebut dan jalankan `node scripts/invest-e2e.mjs --serve` dari `apps/backend`. Harness menolak database non-loopback/nama lain serta database berisi akun; menjalankan modul Auth/Invest asli tanpa cron dan provider. Fixture `invest_test_a` / password `synthetic-invest-only` hanya untuk server uji lokal. Jangan memakai password fixture untuk akun nyata.
 
-Dengan API sintetis di port4000 serta frontend Trackster/Invest di port3000/3001, jalankan `node scripts/browser-check.mjs`, lalu `node scripts/portfolio-browser-check.mjs`, dan `node scripts/market-browser-check.mjs` dari folder ini. Pemeriksaan visual read-only setelah fixture tersebut: `node scripts/review-visual-check.mjs`. Playwright harus tersedia sebagai tool lokal; `PLAYWRIGHT_MODULE` boleh menunjuk instalasi yang sudah ada dan `PLAYWRIGHT_CHROMIUM_PATH` ke binary browser yang cocok. Tidak menambah dependency runtime. Bukti gambar masuk `.artifacts/` (diabaikan Git).
+Dengan API sintetis di port4000 serta frontend Trackster/Invest di port3000/3001, jalankan `node scripts/browser-check.mjs`, lalu `node scripts/portfolio-browser-check.mjs`, dan `node scripts/market-browser-check.mjs` dari folder ini. Pemeriksaan visual read-only setelah fixture tersebut: `node scripts/review-visual-check.mjs`. Untuk tes bantuan penjelasan, tambahkan `--serve-ai` pada harness `--serve` atau `--serve-existing`; hanya provider HTTP sintetis loopback yang dijalankan. Set `INVEST_TEST_PROVIDER_URL` ke alamat fixture yang dicetak harness lalu jalankan `node scripts/explanation-browser-check.mjs` setelah market browser check. Tidak memakai provider eksternal. Playwright harus tersedia sebagai tool lokal; `PLAYWRIGHT_MODULE` boleh menunjuk instalasi yang sudah ada dan `PLAYWRIGHT_CHROMIUM_PATH` ke binary browser yang cocok. Tidak menambah dependency runtime. Bukti gambar masuk `.artifacts/` (diabaikan Git).
 
 Hasil dan batas acceptance terbaru: [06-Implementation.md](../../docs/invest/06-Implementation.md). Tidak ada konfigurasi DNS, container produksi, atau pipeline deployment Invest pada tahap ini.
 

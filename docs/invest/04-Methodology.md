@@ -158,6 +158,8 @@ AI menerima: profile/goal version, snapshot jatah dan holdings yang diperlukan, 
 
 Validator menolak perubahan angka/urutan, sumber asing, klaim return masa depan, dan instruksi untuk melewati gate. Fallback berupa penjelasan template dari ruleset dan daftar kekurangan. Validasi field terstruktur telah diuji pada fixture; konsistensi narasi LLM nyata masih perlu pengujian saat AI Invest diimplementasi. Bahasa narasi boleh berubah, fakta/perhitungan tidak.
 
+Implementasi lokal 2026-10-26 membatasi bantuan AI pada pilihan kalimat untuk klaim server yang wajib dan urutannya tetap. Nominal, identitas, jawaban profil, holdings dan prosa sumber tidak diperlukan untuk pilihan tersebut sehingga tidak dikirim. Penjelasan aturan, cache privat, validasi dan fallback sudah diuji dengan provider sintetis; model nyata belum diuji dan flag AI tetap default off. Ini pembatasan pelaksanaan M6, bukan perubahan bobot atau aturan investasi. Lihat [riset dan kontrak penjelasan](10-Explanation-Research.md).
+
 Setiap hasil menyimpan: user/goal, input source IDs, asOf/fetchedAt, bulan, A/F/J aktual/J rencana/B, holdings/kurs, profil T/C/H dan jawaban, template+stress+hasil penyesuaian, universe/coverage, fitur/ranking, order/residu, versi ruleset, serta alasan withheld. UI tetap menggunakan Trackster v3 menurut D9; detail engine ditempatkan pada bagian alasan/bukti, bukan memenuhi layar utama dengan istilah teknis.
 
 ## M7. Pembaruan, tahap data, dan kriteria handoff

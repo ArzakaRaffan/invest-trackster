@@ -1,6 +1,6 @@
 # Invest Trackster — Dokumentasi Riset
 
-> **Status 2026-10-26:** pembangunan sudah dimulai. Frontend mandiri, anggaran bulanan, tujuan/profil, dan portofolio manual tersedia lokal; [rincian implementasi dan bukti](06-Implementation.md). Metode v0.1 tetap D12. Inti I3 (catalog, alokasi/stress/ranking, pilihan alternatif, snapshot dan reserve→settle) tersedia lokal. Detail/filter/perbandingan catalog dan review perubahan pot/acknowledgment I4 kini tersedia. Data nyata belum layak nominal; AI dan gate pilot/release masih terbuka.
+> **Status 2026-10-26:** pembangunan sudah dimulai. Frontend mandiri, anggaran bulanan, tujuan/profil, dan portofolio manual tersedia lokal; [rincian implementasi dan bukti](06-Implementation.md). Metode v0.1 tetap D12. Inti I3 (catalog, alokasi/stress/ranking, pilihan alternatif, snapshot dan reserve→settle) tersedia lokal. Detail/filter/perbandingan catalog dan review perubahan pot/acknowledgment I4 kini tersedia. Penjelasan aturan dan bantuan AI terbatas tersedia; AI default off. Data nyata belum layak nominal; uji model nyata dan gate pilot/release masih terbuka.
 > **Pemilik keputusan:** Arzaka. Status keputusan terpusat di [00-Decisions.md](00-Decisions.md).
 
 Invest membantu Arzaka membagi jatah **20% dari rencana 50/30/20 Trackster** menjadi nominal dan shortlist investasi sesuai risiko serta tujuan. Invest direncanakan sebagai website terpisah dengan akun dan backend Trackster bersama. Fokusnya investasi jangka panjang dan evaluasi pasar berkala; cakupan pemindaian berkembang bertahap ke Indonesia, global, dan crypto.
@@ -13,7 +13,7 @@ Sumber gratis diutamakan, dengan input data pasar manual yang menyertakan sumber
 
 ## Urutan baca dan peta dokumen
 
-**Untuk melanjutkan:** baca [06-Implementation.md](06-Implementation.md) → [PRD.md](PRD.md) → [00-Decisions.md](00-Decisions.md) → [04-Methodology.md](04-Methodology.md). Lanjutkan dari [riset catalog I3](08-Catalog-Research.md): kelengkapan data/kanal nyata, narasi AI I4 dan pilot. [Riset review](09-Review-Research.md) menjelaskan review deterministik yang sudah tersedia. Dokumen penelitian menyediakan bukti dan batas pengujian, bukan alasan meminta persetujuan metode ulang.
+**Untuk melanjutkan:** baca [06-Implementation.md](06-Implementation.md) → [PRD.md](PRD.md) → [00-Decisions.md](00-Decisions.md) → [04-Methodology.md](04-Methodology.md). Lanjutkan dari [riset catalog I3](08-Catalog-Research.md): kelengkapan data/kanal nyata, uji model nyata I4 dan pilot. [Riset review](09-Review-Research.md) menjelaskan review deterministik yang sudah tersedia. Dokumen penelitian menyediakan bukti dan batas pengujian, bukan alasan meminta persetujuan metode ulang.
 
 1. Baca dokumen ini untuk batas pekerjaan dan status.
 2. Baca [00-Decisions.md](00-Decisions.md) sebelum menetapkan perilaku produk.
@@ -32,10 +32,11 @@ Sumber gratis diutamakan, dengan input data pasar manual yang menyertakan sumber
 | [04-Methodology.md](04-Methodology.md) | Aturan jatah, profil, alokasi, kelayakan, ranking, order/AI dan operasi | APPROVED melalui D12, baseline pembangunan |
 | [05-Validation-Results.md](05-Validation-Results.md) | Hasil assertion, stress, histori USD dan status V1–V7 | 47.596 assertion lulus; histori eksploratif 2019–2025, bukan validasi produk Indonesia |
 | [PRD.md](PRD.md) | Layar, aturan, kontrak data/API, acceptance criteria, tahapan dan kompatibilitas | Baseline pembangunan yang sudah disetujui |
-| [06-Implementation.md](06-Implementation.md) | Perubahan kode, bukti runtime, batas fitur dan kelanjutan | I0/I1 + inti I2/I3 lokal; data nyata, narasi AI dan I5/I6 belum selesai |
+| [06-Implementation.md](06-Implementation.md) | Perubahan kode, bukti runtime, batas fitur dan kelanjutan | I0/I1 + inti I2/I3 dan review/penjelasan I4 lokal; uji model nyata, data dan I5/I6 belum selesai |
 | [07-Repository.md](07-Repository.md) | Asal snapshot, cakupan source, dan batas pipeline deployment | Repository Invest terpisah sesuai permintaan Arzaka |
 | [08-Catalog-Research.md](08-Catalog-Research.md) | Pemeriksaan sumber primer produk/kanal, batas bukti dan penerapannya | Tiga catatan Indonesia masih riset, tanpa quote/histori karangan |
 | [09-Review-Research.md](09-Review-Research.md) | Bukti review, batas5 pp, perbandingan dan acknowledgment | Review deterministik tersedia; kalibrasi/model nyata tetap terbuka |
+| [10-Explanation-Research.md](10-Explanation-Research.md) | Kontrak penjelasan, minimisasi data, validator dan fallback | Implementasi lokal teruji dengan provider sintetis; model nyata belum diuji |
 
 Artefak yang dapat dijalankan ulang: [method_checks.py](research/method_checks.py) dan [results-v0.1.json](research/results-v0.1.json). Seluruh fixture sintetis; tidak ada input finansial pribadi.
 
@@ -51,7 +52,7 @@ Periode utama **bulanan**, dengan **rencana jatah dan jatah aktual terpisah**. M
 
 ## Pekerjaan berikutnya
 
-- Lengkapi catalog nyata dan narasi AI I4; review/perubahan pot dan detail/filter/perbandingan I3 sudah tersedia. Reserve→settle sudah terhubung dengan evaluation ACTUAL tervalidasi. Domain/hosting O9 tetap keputusan deployment tersendiri; tidak menghalangi pembangunan lokal.
+- Lengkapi catalog nyata dan uji bantuan penjelasan pada model nyata sesuai [riset penjelasan](10-Explanation-Research.md); review/perubahan pot dan detail/filter/perbandingan I3 sudah tersedia. Reserve→settle sudah terhubung dengan evaluation ACTUAL tervalidasi. Domain/hosting O9 tetap keputusan deployment tersendiri; tidak menghalangi pembangunan lokal.
 - Gunakan [status hasil V1–V7](05-Validation-Results.md) untuk membedakan pemeriksaan penelitian yang selesai dan validasi pilot/produksi yang membutuhkan app, catalog nyata, atau input pengguna.
 - Periksa hak penggunaan sumber sesuai deployment yang dipilih; lengkapi metadata instrumen Indonesia dan akses produk global yang benar-benar tersedia untuk pengguna.
 - Catat hasil baru dengan sumber, tanggal pemeriksaan, konteks, keterbatasan, dan bagian produk yang terpengaruh. Ubah keputusan hanya dengan bukti persetujuan pengguna.

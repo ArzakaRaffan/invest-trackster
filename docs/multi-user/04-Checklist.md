@@ -27,7 +27,7 @@ Kolom: **Svc** = semua method service ber-`userId` & `where` memuat `userId` · 
 | income-stream | `income-stream.service.ts` | [x] | [x] | [x] | [~] | |
 | income | `income.service.ts` | [x] | [x] | [x] | [~] | `classify(userId,…)`, korelasi `EmailParseLog` per user, `createFromParsed`, `resolve`, `remove` |
 | income-forecast | `income-forecast.service.ts` | [x] | [x] | [x] | [~] | `income-forecast.check.ts` |
-| invest (I0/I1 + inti I2/I3 + review I4 lokal) | `invest*.service.ts`, `invest-*.ts` | [x] | [x] | n/a | [x] | guard default deny; receipt/event/cash serta goal/profile/holding/ledger/evaluation/access isolation, catalog ADMIN, reserve→settle, filter/access/compare, review/ack tanpa uang, idempotency dan race lewat `scripts/invest-e2e.mjs`; bukan acceptance app Invest lengkap |
+| invest (I0/I1 + inti I2/I3 + review I4 lokal) | `invest*.service.ts`, `invest-*.ts` | [x] | [x] | n/a | [x] | guard default deny; receipt/event/cash serta goal/profile/holding/ledger/evaluation/access isolation, catalog ADMIN, reserve→settle, filter/access/compare, review/ack tanpa uang, penjelasan/AI quota/cache/fallback privat, idempotency dan race lewat `scripts/invest-e2e.mjs`; bukan acceptance app Invest lengkap |
 | income-checkin | `income-checkin.service.ts`, `…-reminder.service.ts` | [x] | [x] | [x] | [~] | cron per user; callback Telegram by user |
 | transaction | `transaction.service.ts` (51 panggilan Prisma) | [x] | [x] | [x] | [~] | `createFromParsed(userId,…)`, `getInsights(userId)`, `updateMany` kategori, dedup `(userId,emailId)` |
 | budget-allocation | `budget-allocation.service.ts` | [x] | [x] | [x] | [~] | menulis `DailyBudget` per user |
