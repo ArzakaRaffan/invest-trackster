@@ -39,6 +39,21 @@ try {
   await page.getByRole('heading',{name:'Schroder Dana Likuid',exact:true}).waitFor();
   eq(await page.getByRole('button',{name:'Kelola catatan',exact:true}).count(),0,'member has no catalog write UI');
   eq(await page.getByTestId('market-instrument').count(),3,'sourced research catalog available without fixture prices');
+  await page.getByRole('combobox',{name:/^Kelompok aset/}).selectOption('BONDS');
+  await eventually(async()=>await page.getByTestId('market-instrument').count()===1,'class filter loaded');
+  await page.getByRole('combobox',{name:/^Pemeriksaan kelayakan/}).selectOption('ELIGIBLE');
+  await page.getByText('Belum ada catatan yang cocok dengan filter ini.',{exact:true}).waitFor();checks++;
+  await page.getByRole('combobox',{name:/^Kelompok aset/}).selectOption('');await page.getByRole('combobox',{name:/^Pemeriksaan kelayakan/}).selectOption('');
+  await page.getByLabel('Cari instrumen atau kanal',{exact:true}).fill('myBCA');await page.getByRole('button',{name:'Cari',exact:true}).click();
+  await page.getByRole('heading',{name:'Schroder Dana Likuid',exact:true}).waitFor();
+  await eventually(async()=>await page.getByTestId('market-instrument').count()===1,'channel search');
+  await page.getByRole('button',{name:'Cari',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Lihat detail',exact:true}).click();
+  await page.getByRole('heading',{name:'Identitas dan pencairan',exact:true}).waitFor();
+  eq(await page.getByText('Biaya belum lengkap. Tidak diasumsikan nol.',{exact:true}).isVisible(),true,'unknown fees in sourced detail stay unknown');
+  await page.setViewportSize({width:390,height:844});eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'detail facts fit mobile');
+  await page.screenshot({path:'.artifacts/i4-instrument-mobile-dark.png',fullPage:true});
+  await page.getByRole('link',{name:'Kembali ke pasar',exact:false}).click();await page.waitForURL('**/app/market');await page.getByRole('heading',{name:'Schroder Dana Likuid',exact:true}).waitFor();
   await page.setViewportSize({width:390,height:844});
   eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'research catalog fits mobile');
   await page.screenshot({path:'.artifacts/i3-market-mobile-dark.png',fullPage:true});
@@ -70,6 +85,14 @@ try {
     await dialog.waitFor({state:'hidden'});
     await card.getByText('Lolos pemeriksaan data',{exact:true}).waitFor(); checks++;
   }
+  const equityCard=page.getByTestId('market-instrument').filter({has:page.getByRole('heading',{name:'Synthetic EQUITY test fund',exact:true})});
+  await equityCard.getByRole('checkbox',{name:'Bandingkan',exact:true}).check();
+  const bondCard=page.getByTestId('market-instrument').filter({has:page.getByRole('heading',{name:'Synthetic BONDS test fund',exact:true})});
+  eq(await bondCard.getByRole('checkbox',{name:'Bandingkan',exact:true}).isDisabled(),true,'cross-peer checkbox blocked');
+  await page.getByTestId('market-instrument').filter({has:page.getByRole('heading',{name:'Synthetic equity alternative',exact:true})}).getByRole('checkbox',{name:'Bandingkan',exact:true}).check();
+  await page.getByRole('link',{name:'Bandingkan pilihan',exact:true}).click();await page.getByTestId('comparison-instrument').first().waitFor();
+  eq(await page.getByTestId('comparison-instrument').count(),2,'two comparable detail columns');eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'comparison fits mobile');
+  await page.setViewportSize({width:1400,height:1000});await page.screenshot({path:'.artifacts/i4-comparison-desktop-dark.png',fullPage:true});await page.setViewportSize({width:390,height:844});
   await page.goto('http://localhost:3001/app/plan');
   await page.getByRole('button',{name:'Evaluasi tujuan',exact:true}).click();
   await dialog.getByRole('button',{name:'Hitung dan simpan evaluasi',exact:true}).click();
@@ -96,6 +119,20 @@ try {
   await eventually(async()=> (await get()).reservations.some(r=>r.effectiveStatus==='SETTLED'),'realization persisted');
   const settled=await get();eq(settled.budget.reservations,'0.00','settlement removes reserve');eq(settled.budget.freeCash,'0.00','contribution consumed once');eq(settled.ledger.length,3,'two purchases plus explicit cash saving');
   const old=(await (await context.request.get(`http://localhost:4000/invest/evaluations/${withheldId}`)).json());eq(old.result,before,'earlier withheld archive unchanged');eq(old.stale,true,'earlier archive marks changed input');
+  await page.goto(`http://localhost:3001/app/reviews/${evaluationId}`);await page.getByTestId('review-item').waitFor();
+  const reviewedBefore=await get();
+  await page.getByRole('button',{name:'Catat peninjauan',exact:true}).click();await dialog.getByLabel('Catatan peninjauan',{exact:true}).fill('Synthetic review, no orders');await dialog.getByRole('checkbox').check();
+  let ackCut=false;await page.route('**/invest/reviews/*/acknowledge',async route=>{if(!ackCut){ackCut=true;const r=await route.fetch();eq(r.status(),201,'ack committed before lost response');await route.abort('failed');}else await route.continue();});
+  await dialog.getByRole('button',{name:'Sudah ditinjau',exact:true}).click();await dialog.getByRole('button',{name:'Ulangi kiriman',exact:true}).click();
+  await page.getByTestId('review-status').getByText('Sudah ditinjau',{exact:true}).waitFor();
+  const reviewedAfter=await get();eq(reviewedAfter.revision,reviewedBefore.revision,'ack does not alter portfolio revision');eq(reviewedAfter.ledger,reviewedBefore.ledger,'ack creates no financial movement');
+  await page.reload();await page.getByTestId('review-status').getByText('Sudah ditinjau',{exact:true}).waitFor();checks++;
+  await write(admin,`/invest/catalog/instruments/${fixtureIds[0]}/observations`,{expectedVersion:1,quote:marketFacts('BONDS').quote});
+  await page.reload();await page.getByTestId('review-status').getByText('Perlu ditinjau',{exact:true}).waitFor();checks++;
+  eq(await page.getByRole('button',{name:'Cadangkan rencana',exact:true}).count(),0,'ack cannot unlock stale or settled evaluation');
+  await page.setViewportSize({width:390,height:844});
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'review changes fit mobile');
+  await page.screenshot({path:'.artifacts/i4-review-mobile-dark.png',fullPage:true});
   await page.goto('http://localhost:3001/app/reviews');
   await page.locator('.archive-row').first().waitFor();
   eq(await page.locator('.archive-row').count(),3,'all snapshots visible in history');
@@ -105,6 +142,6 @@ try {
   await page.screenshot({path:'.artifacts/i3-evaluation-mobile-light-en.png',fullPage:true});
   await page.goto('http://localhost:3001/app/sources');await page.getByRole('heading',{name:'Data sources',exact:true}).waitFor();await page.locator('.source-record a').first().waitFor();eq(await page.locator('.source-record a').count()>=4,true,'sources remain linked in English');
   eq(faults,[],'no browser runtime errors or local5xx');
-  console.log(`PASS: ${checks} I3 browser assertions; catalog, source/access privacy, immutable/retried evaluation, reserve/settle, history and responsive ID/EN.`);
+  console.log(`PASS: ${checks} I3/I4 browser assertions; detail/filter/peer comparison and review/ack, catalog, source/access privacy, immutable/retried evaluation, reserve/settle, history and responsive ID/EN.`);
 } catch(error){await page.screenshot({path:'.artifacts/i3-browser-failure.png',fullPage:true}).catch(()=>{});throw error;}
 finally{await browser.close();}

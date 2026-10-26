@@ -1,0 +1,43 @@
+// Read-only layout verification after market-browser-check.mjs on its synthetic fixture.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { mkdir } from 'node:fs/promises';
+const require = createRequire(import.meta.url), { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {}) });
+let checks = 0;
+const eq = (a,b,label) => { assert.deepEqual(a,b,label); checks++; };
+await mkdir('.artifacts', { recursive: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage(), faults = [];
+  page.on('pageerror', e => faults.push(String(e))); page.on('response', r => { if (r.status() >= 500 && r.url().startsWith('http://localhost:')) faults.push(r.url()); });
+  await page.goto('http://localhost:3001/login'); await page.getByLabel('Username',{exact:true}).fill('invest_test_b');
+  await page.locator('input[autocomplete="current-password"]').fill('synthetic-invest-only'); await page.getByRole('button',{name:'Masuk',exact:true}).click(); await page.waitForURL('**/app');
+  await page.goto('http://localhost:3001/app/market'); await page.getByTestId('market-instrument').first().waitFor();
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'filters fit390px');
+  const select = page.locator('.market-select').first();
+  eq(await select.evaluate(el=>getComputedStyle(el).flexDirection),'row','comparison checkbox stays beside its label');
+  eq((await select.boundingBox()).height>=44,true,'comparison label has44px touch area');
+  await page.goto('http://localhost:3001/app/market/compare?ids=synthetic-browser-equity,synthetic-browser-equity-alternative');
+  await page.getByTestId('comparison-instrument').first().waitFor(); await page.evaluate(()=>document.fonts.ready);
+  eq(await page.getByTestId('comparison-instrument').count(),2,'same-peer comparison loaded');
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'comparison fits390px');
+  await page.setViewportSize({width:1400,height:1000});
+  const columns = await page.getByTestId('comparison-instrument').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().x));
+  eq(columns[1]>columns[0],true,'comparison uses side-by-side desktop columns');
+  const evaluations = await (await context.request.get('http://localhost:4000/invest/evaluations')).json();
+  const evaluationId = evaluations.items[0].id;
+  await page.setViewportSize({width:390,height:844});await page.goto(`http://localhost:3001/app/reviews/${evaluationId}`);
+  await page.getByTestId('review-item').waitFor();await page.evaluate(()=>document.fonts.ready);
+  eq(await page.getByRole('meter').count(),4,'all four current pot weights rendered');
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'review fits390px after data load');
+  eq(await page.getByRole('meter').first().evaluate(el=>el.getBoundingClientRect().width>250),true,'weight visual remains legible on mobile');
+  await page.getByTestId('review-item').screenshot({path:'.artifacts/i4-review-card-mobile-dark.png'});
+  await page.goto('http://localhost:3001/app/menu');await page.getByRole('button',{name:'Lega',exact:true}).click();await page.getByRole('button',{name:'Gelap',exact:true}).last().click();await page.getByRole('button',{name:'Indonesia',exact:true}).click();
+  await page.goto(`http://localhost:3001/app/reviews/${evaluationId}`);await page.getByTestId('review-item').waitFor();await page.getByRole('heading',{name:'What changed?',exact:true}).waitFor();await page.evaluate(()=>document.fonts.ready);
+  eq(await page.getByTestId('review-status').getByText('Needs review',{exact:true}).isVisible(),true,'English live review status');
+  eq(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'compact light English review fits390px');
+  eq(await page.getByRole('button',{name:'Reserve plan',exact:true}).count(),0,'review does not unlock settled/stale result');
+  await page.getByTestId('review-item').screenshot({path:'.artifacts/i4-review-card-mobile-light-en.png'});
+  eq(faults,[],'no runtime errors or local5xx');
+  console.log(`PASS: ${checks} read-only review/detail layout checks on the synthetic fixture.`);
+} finally { await browser.close(); }

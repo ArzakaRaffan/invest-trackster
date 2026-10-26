@@ -1,6 +1,6 @@
 # Invest — frontend Trackster
 
-Implementasi lokal tahap I0/I1 serta inti I2/I3 dari [PRD](../../docs/invest/PRD.md). Beranda/Rencana menampilkan jatah bulanan aktual dan forecast, konfirmasi kas bebas, serta rekonsiliasi receipt. Wizard `/setup` menyimpan tujuan/profil/knowledge; Portofolio menyimpan kepemilikan awal, valuasi, pergerakan, dan koreksi. Rencana menampilkan T/C/H serta jatah setelah pemakaian. Pasar/Sumber memuat catatan bersumber dan akses privat. Rencana dapat menghitung alokasi, stress dan ranking; `/app/reviews/:id` menyimpan hasil, alternatif, bukti, reservasi dan realisasi. Katalog nyata awal masih riset sehingga tidak menghasilkan nominal pembelian. AI/review berkala belum diaktifkan.
+Implementasi lokal tahap I0/I1 serta inti I2/I3 dari [PRD](../../docs/invest/PRD.md). Beranda/Rencana menampilkan jatah bulanan aktual dan forecast, konfirmasi kas bebas, serta rekonsiliasi receipt. Wizard `/setup` menyimpan tujuan/profil/knowledge; Portofolio menyimpan kepemilikan awal, valuasi, pergerakan, dan koreksi. Rencana menampilkan T/C/H serta jatah setelah pemakaian. Pasar/Sumber memuat catatan bersumber dan akses privat. Rencana dapat menghitung alokasi, stress dan ranking; `/app/reviews/:id` menyimpan hasil, alternatif, bukti, reservasi dan realisasi. Katalog nyata awal masih riset sehingga tidak menghasilkan nominal pembelian. Detail/filter/perbandingan dan review berkala deterministik sudah aktif. Narasi AI belum diaktifkan.
 
 ## Menjalankan lokal
 
@@ -29,7 +29,7 @@ Sidebar **Tanya Track** membuka assistant Trackster. Invest belum mengaktifkan A
 
 Tes DB/API: buat database PostgreSQL **kosong** bernama `invest_test_<suffix>` di loopback, migrasikan dengan CLI Prisma, lalu set `INVEST_TEST_DATABASE_URL` ke database tersebut dan jalankan `node scripts/invest-e2e.mjs --serve` dari `apps/backend`. Harness menolak database non-loopback/nama lain serta database berisi akun; menjalankan modul Auth/Invest asli tanpa cron dan provider. Fixture `invest_test_a` / password `synthetic-invest-only` hanya untuk server uji lokal. Jangan memakai password fixture untuk akun nyata.
 
-Dengan API sintetis di port4000 serta frontend Trackster/Invest di port3000/3001, jalankan `node scripts/browser-check.mjs`, lalu `node scripts/portfolio-browser-check.mjs`, dan `node scripts/market-browser-check.mjs` dari folder ini. Playwright harus tersedia sebagai tool lokal; `PLAYWRIGHT_MODULE` boleh menunjuk instalasi yang sudah ada dan `PLAYWRIGHT_CHROMIUM_PATH` ke binary browser yang cocok. Tidak menambah dependency runtime. Bukti gambar masuk `.artifacts/` (diabaikan Git).
+Dengan API sintetis di port4000 serta frontend Trackster/Invest di port3000/3001, jalankan `node scripts/browser-check.mjs`, lalu `node scripts/portfolio-browser-check.mjs`, dan `node scripts/market-browser-check.mjs` dari folder ini. Pemeriksaan visual read-only setelah fixture tersebut: `node scripts/review-visual-check.mjs`. Playwright harus tersedia sebagai tool lokal; `PLAYWRIGHT_MODULE` boleh menunjuk instalasi yang sudah ada dan `PLAYWRIGHT_CHROMIUM_PATH` ke binary browser yang cocok. Tidak menambah dependency runtime. Bukti gambar masuk `.artifacts/` (diabaikan Git).
 
 Hasil dan batas acceptance terbaru: [06-Implementation.md](../../docs/invest/06-Implementation.md). Tidak ada konfigurasi DNS, container produksi, atau pipeline deployment Invest pada tahap ini.
 
@@ -42,3 +42,11 @@ Lihat [riset dan batas sumber](../../docs/invest/08-Catalog-Research.md). ADMIN 
 Member memeriksa status kanal, pemahaman dan persetujuan lock sendiri; review terikat versi catalog. Mapping holding ke instrumen ada pada Pasar. `POST /invest/evaluations` memakai bulan, goal, PLAN/ACTUAL, `peers` dan `selections` opsional (maksimal satu kandidat per kelas). Pilihan di luar shortlist layak tidak menembus gate. Pengubahan kandidat membuat snapshot baru. Nominal PLAN tidak dapat dicadangkan.
 
 Reservasi mengambil seluruh kontribusi hasil server, berlaku maksimal24jam, dan dapat dibatalkan. Settlement mencatat pembelian di kanal luar serta kas tujuan yang benar-benar sudah dipisahkan; tidak melakukan transaksi broker atau debit bank. Sumber/input basi memerlukan evaluasi ulang; pembelian yang terlanjur terjadi tetap dicatat melalui portofolio manual dengan alasan. Belum ada adapter harga/cron. `INVEST_GLOBAL_ENABLED` dan `INVEST_CRYPTO_ENABLED` defaultfalse; mengaktifkannya tidak menghapus syarat data, lisensi, akses, pemahaman atau batas profil.
+
+## Detail pasar dan review
+
+Pasar menyediakan pencarian nama/issuer/kanal, filter kelas/wilayah/gate/akses privat, detail `/app/market/:id` dan perbandingan `/app/market/compare?ids=a,b`. Pilih2–3 instrumen dalam peer yang sama. Unknown tidak menjadi0; ranking tetap hanya berasal dari evaluasi dengan nominal/horizon tertentu.
+
+`GET /invest/reviews` menyediakan10 review aktual per halaman; `evaluationId` memilih satu baseline, `cursor` membaca halaman berikutnya. POST `/invest/reviews/:id/acknowledge` menerima `reviewKey`, `confirmed=true`, `note`, `expectedRevision` dan `idempotencyKey`. Review key berasal dari respons server. Acknowledgment terikat keadaan yang ditampilkan; tidak membuka snapshot basi dan tidak mencatat uang. Audit menggunakan `InvestChange` yang sudah ada, tanpa migrasi baru.
+
+Review membaca keadaan kini saat request; UI melakukan refresh30detik. Belum ada cron/notifikasi/AI. Deviasi membandingkan pot yang sudah tercatat dengan target arsip yang masih sesuai profil/goal/metode. Sumber berubah, profil memerlukan review atau valuasi kurang tetap terlihat setelah acknowledgment; perubahan berikutnya memerlukan peninjauan lagi. Lihat [riset review](../../docs/invest/09-Review-Research.md) dan [bukti implementasi](../../docs/invest/06-Implementation.md).
