@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma.service';
 import { wibDateKey } from '../../common/wib';
 import { buildBudget, fingerprint, INVEST_RULESET, money, monthBounds, PaymentEvent, receiptRevision, validDate } from './invest-budget';
 import { InvestCashDto, InvestEventDto } from './invest.dto';
+import { investAiConfig } from './invest-explanation-provider';
 import { accountBudget } from './invest-accounting';
 import { evaluateProfile, RiskAnswers } from './invest-profile';
 
@@ -23,7 +24,7 @@ export class InvestService {
         confirmedAt: p.confirmedAt, profileGoalVersion: p.goalVersion, conflictsAcknowledged: p.conflictsAcknowledged }) : null;
       const holdingsKnown = goal?.holdingsDeclaration === 'EMPTY' || goal?.holdingsDeclaration === 'ENTERED' && await tx.investHolding.count({ where: { userId, goalId: goal.id } }) > 0;
       return { enabled: true, ruleset: INVEST_RULESET, phase: 'I3', activeGoalId: goal?.id ?? null, setupComplete: !!holdingsKnown && profile?.status === 'READY',
-      capabilities: { monthlyBudget: true, cashConfirmation: true, paymentReconciliation: true, profiles: true, portfolio: true, ledger: true, evaluations: true, reservations: true, ai: false },
+      capabilities: { monthlyBudget: true, cashConfirmation: true, paymentReconciliation: true, profiles: true, portfolio: true, ledger: true, evaluations: true, reservations: true, explanations: true, ai: !!investAiConfig() },
       coverage: { indonesia: 'PARTIAL_MANUAL', global: process.env.INVEST_GLOBAL_ENABLED === 'true' ? 'GATED' : 'RESEARCH_ONLY', crypto: process.env.INVEST_CRYPTO_ENABLED === 'true' ? 'GATED' : 'RESEARCH_ONLY' } };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }

@@ -13,6 +13,7 @@ process.env.DATABASE_URL = url;
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.AUTH_CACHE_MS = '0';
 process.env.INVEST_ENABLED = 'true';
+process.env.INVEST_AI_ENABLED = 'false'; // Never inherit live provider activation into synthetic browser fixtures.
 process.env.NODE_ENV = 'test';
 delete process.env.COOKIE_DOMAIN;
 require('reflect-metadata');
@@ -56,15 +57,18 @@ async function login(username) {
 const month = wibDateKey(new Date()).slice(0, 7);
 const path = `/invest/budget?month=${month}`;
 let a, b, c, sa, sb, receiptA, cookieA, cookieB;
+let explanationFixture;
+const browserProvider = async () => { if (process.argv.includes('--serve-ai')) explanationFixture = await (await import('./invest-explanation-fixture.mjs')).startExplanationFixture(); };
 // Restart only the previously generated three-account synthetic fixture after a build.
 if (process.argv.includes('--serve-existing')) {
   try {
     const users = await prisma.user.findMany({ select: { id: true, username: true } });
     assert.deepEqual(users.map(u => u.username).sort(), ['invest_test_a', 'invest_test_b', 'invest_test_denied']);
     process.env.INVEST_USER_IDS = users.filter(u => u.username !== 'invest_test_denied').map(u => u.id).join(',');
+    await browserProvider();
     console.log(`Existing synthetic test API ready on http://localhost:${port}; stop with Ctrl+C.`);
     await new Promise(resolve => { process.on('SIGINT', resolve); process.on('SIGTERM', resolve); });
-  } finally { await app.close(); }
+  } finally { await explanationFixture?.close(); await app.close(); }
   process.exit(0);
 }
 try {
@@ -153,9 +157,11 @@ try {
   await marketChecks({ prisma, request, eq, a, b, cookieA, cookieB: await login(b.username), month });
   console.log(`PASS: ${checks} Invest API assertions; tenant isolation, source revisions, serializable writes, shared auth/CORS, and unchanged legacy rows.`);
   if (process.argv.includes('--serve')) {
+    await browserProvider();
     console.log(`Synthetic test API ready on http://localhost:${port}; fixture user invest_test_a; stop with Ctrl+C.`);
     await new Promise(resolve => { process.on('SIGINT', resolve); process.on('SIGTERM', resolve); });
   }
 } finally {
+  await explanationFixture?.close();
   await app.close();
 }

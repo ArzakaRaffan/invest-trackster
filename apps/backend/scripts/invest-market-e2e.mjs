@@ -97,6 +97,8 @@ export async function marketChecks({ prisma, request, eq, a, b, cookieA, cookieB
   eq(await legacy(), before, 'I3 does not mutate legacy Income/BankBalance/DailyBudget');
   const { reviewChecks } = await import('./invest-review-e2e.mjs');
   await reviewChecks({ prisma, request, eq, get, write, cookieA, cookieB, a, evaluation: e.body, instrumentId: ids[0], quote: marketFacts('BONDS').quote });
+  const { explanationChecks } = await import('./invest-explanation-e2e.mjs');
+  await explanationChecks({ prisma, request, eq, get, cookieA, cookieB, a, evaluation: e.body });
   const where = { userId: { in: [a.id,b.id] } };
   for (const model of ['investEvaluation','investInstrumentAccess','investCatalogRevision','investMutation','investChange','investReservation','investLedger','investHolding','investRiskProfile','investGoal','investMonth']) await prisma[model].deleteMany({ where });
   await prisma.investInstrument.deleteMany({ where: { id: { in: ids } } });

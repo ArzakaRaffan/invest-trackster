@@ -8,6 +8,9 @@ import { InvestPortfolioController } from './invest-portfolio.controller';
 import { InvestMarketController } from './invest-market.controller';
 import { InvestMarketService } from './invest-market.service';
 import { InvestPayloadGuard } from './invest-payload.guard';
+import { InvestExplanationController, InvestExplanationQuotaGuard } from './invest-explanation.controller';
+import { InvestExplanationProvider } from './invest-explanation-provider';
+import { InvestExplanationService } from './invest-explanation.service';
 
-@Module({ imports: [AuthModule], controllers: [InvestController, InvestPortfolioController, InvestMarketController], providers: [InvestService, InvestPortfolioService, InvestMarketService, InvestAccessGuard, InvestPayloadGuard] })
+@Module({ imports: [AuthModule], controllers: [InvestController, InvestPortfolioController, InvestMarketController, InvestExplanationController], providers: [InvestService, InvestPortfolioService, InvestMarketService, InvestAccessGuard, InvestPayloadGuard, InvestExplanationProvider, InvestExplanationService, InvestExplanationQuotaGuard] })
 export class InvestModule {}
