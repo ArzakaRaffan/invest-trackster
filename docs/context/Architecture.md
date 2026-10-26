@@ -4,7 +4,7 @@
 | Modul | Folder / file | Tanggung jawab |
 |---|---|---|
 | auth | `apps/backend/src/modules/auth` | Login username/password (bcrypt) → JWT 7d di cookie httpOnly `trackster_jwt`. `JwtAuthGuard` di `common/guards/` baca cookie itu. |
-| invest | `apps/backend/src/modules/invest` | I0/I1 + inti I2: jatah bulanan20%, kas/revision, event/receipt, tujuan/profil, holdings dan ledger manual; hanya tabel Invest yang ditulis. Default deny melalui feature flag + user ID eksplisit. Status/bukti: `docs/invest/06-Implementation.md`. |
+| invest | `apps/backend/src/modules/invest` | I0/I1 + inti I2/I3: jatah bulanan20%, event/receipt, tujuan/profil/ledger, catalog bersama + akses privat, engine deterministik, snapshot dan reserve→settle; hanya tabel Invest yang ditulis. Default deny melalui feature flag + user ID eksplisit. Status/bukti: `docs/invest/06-Implementation.md`. |
 | gmail | `apps/backend/src/modules/gmail` | OAuth2 Gmail (`gmail-auth.service`), cron sync tiap 5 menit (`gmail-sync.service`), parser BCA/Jago di `parsers/` + `parser-registry.service`. |
 | sync | `apps/backend/src/modules/sync` | Endpoint manual `POST /sync/trigger`, `GET /sync/next-run`, `GET /sync/logs`. Delegasi ke `GmailSyncService`. |
 | transaction | `apps/backend/src/modules/transaction` | CRUD transaksi, weekly/monthly/summary/insights, note/category/alias. Tiap create/delete gerakin saldo. |

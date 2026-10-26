@@ -4,8 +4,12 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 
 ## Invest — tambahan lokal 2026-10-26
 
+- I3: `invest-engine.ts` (gate, M3–M6, peer/top3, lot/biaya dan full-pot stress), `invest-catalog.ts` (tiga catatan nyata research-only), `invest-market.service.ts/controller.ts/dto.ts` (versi metadata, akses privat, mapping, snapshot, pilihan kandidat dan reserve→settle). `invest-payload.guard.ts` memvalidasi raw DTO sebelum global pipe lama menghapus unknown fields.
+- Migrasi `20261026140000_invest_market_evaluation`: catalog bersama `InvestInstrument`; actor audit `InvestCatalogRevision`, akses `InvestInstrumentAccess` dan arsip `InvestEvaluation` berscope user. Tambahan mapping holding + plan/settledLedgerIds reservasi, tanpa perubahan tabel keuangan lama.
+- UI I3: `InvestMarket.tsx`, `InvestEvaluation.tsx`, `lib/market.ts`; Pasar/Sumber, panel Rencana, `/app/reviews` dan `/app/reviews/[id]`. UI sumber memakai metadata manual; tidak ada harga sintetis produksi. QA: `invest-engine.check.ts`, `scripts/invest-market-e2e.mjs`, `apps/invest/scripts/market-browser-check.mjs`.
+
 - Inti I2: `invest-portfolio.service.ts/controller.ts/dto.ts` (tujuan, versi profil, holdings/ledger, koreksi, idempotency dan pembatalan reservasi), `invest-profile.ts` (M2), `invest-accounting.ts` (jatah/kas/credit), Decimal clone presisi60 di `invest-budget.ts`.
-- Migrasi `20261026110000_invest_profile_portfolio`: tujuh tabel tenant baru + watermark ledger di InvestMonth, FK komposit user, unique parsial satu goal aktif, TTL reservasi maksimum24jam. Create/settle reservasi belum diekspos sebelum evaluation ACTUAL I3.
+- Migrasi `20261026110000_invest_profile_portfolio`: tujuh tabel tenant baru + watermark ledger di InvestMonth, FK komposit user, unique parsial satu goal aktif, TTL reservasi maksimum24jam. Create/settle kini diekspos lewat market controller, wajib evaluation ACTUAL valid.
 - Frontend `GoalsAndRisk.tsx`/`Portfolio.tsx`/`InvestForms.tsx`: wizard, hasil T/C/H, input/pergerakan manual, koreksi, retry key, dialog v3. API daftar baru `/invest/portfolio`, `/goals`, `/holdings`, `/ledger`, `/reservations`; POST/PATCH/PUT sesuai PRD. Tidak ada perubahan route keuangan lama.
 - QA tambahan: `invest-profile.check.ts`, `invest-accounting.check.ts`, `scripts/invest-portfolio-e2e.mjs`, `apps/invest/scripts/portfolio-browser-check.mjs`.
 

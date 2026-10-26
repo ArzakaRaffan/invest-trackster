@@ -374,3 +374,9 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Tujuh tabel tenant aditif, unique parsial goal aktif, FK composite user, idempotency/revision/Serializable. Tidak menulis keuangan Trackster. Watermark ledger dan revisi kapasitas/goal mencegah konfirmasi kas lama hidup kembali; Decimal clone lokal menjaga presisi unit/FX tanpa mengubah Trackster.
 - Akuntansi TTL/cancel reservasi tersedia; create/settle menunggu snapshot evaluation ACTUAL I3. Ini bukan kelulusan seluruh AC-L1/I2 atau rekomendasi produksi.
 - Bukti final, keterbatasan dan langkah berikutnya: [`../invest/06-Implementation.md`](../invest/06-Implementation.md). Pengujian hanya fixture/database loopback terpisah; `.claude/launch.json` tetap perubahan yang sudah ada, tidak disentuh.
+
+## 2026-10-26 — Invest inti I3 pada repository terpisah
+- Arzaka meminta riset + implementasi berlanjut setelah source di-push ke `ArzakaRaffan/invest-trackster`; branch kerja `feat/invest-market-evaluation`, baseline `2fee407`. Tidak mengubah deployment/migrasi multi-user Trackster.
+- Catalog bersumber, rights/eligibility, alokasi/ranking/full-pot stress, pilihan alternatif, snapshot immutable dan reserve→settle manual terhubung ke UI v3. Catatan nyata awal masih riset; tidak ada nominal pasar palsu atau AI aktif.
+- Satu tabel catalog bersama dan tiga tabel berscope user; audit actor tidak dibagikan. Revision/idempotency/Serializable menahan stale/concurrent overspend; settlement mengganti reservasi sekali tanpa debit bank. Guard raw DTO dan canonical JSONB equality diuji.
+- Build/Prisma,4 check Invest (engine1.240 assertion),227 assertion API,32+31+30 browser serta8 pemeriksaan visual/arsip, audit tenancy0temuan lulus pada fixture sintetis. Bukti, SQL compatibility, keterbatasan dan langkah berikutnya: [`../invest/06-Implementation.md`](../invest/06-Implementation.md); riset primer: [`../invest/08-Catalog-Research.md`](../invest/08-Catalog-Research.md).

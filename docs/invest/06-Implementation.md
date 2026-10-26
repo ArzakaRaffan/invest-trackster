@@ -2,6 +2,50 @@
 
 [PRD](PRD.md) · [Keputusan](00-Decisions.md) · [Metode](04-Methodology.md) · [Menjalankan lokal](../../apps/invest/README.md)
 
+## 2026-10-26 — Catalog, engine dan realisasi I3
+
+**Otorisasi:** Arzaka meminta melanjutkan riset dan implementasi setelah source masuk repository Invest. Pekerjaan di checkout `invest-trackster`, branch `feat/invest-market-evaluation`, dari `2fee407`; metode D12 tetap `invest-method-v0.1`. Publikasi source mengikuti permintaan push ke repo Invest sebelumnya, tanpa deployment Trackster/Invest.
+
+### Hasil yang dapat dijalankan
+
+- Pasar/Sumber memuat tiga catatan penelitian Indonesia beserta URL, bagian dokumen, tanggal pemeriksaan, dan batas hak pakai. [Riset primer I3](08-Catalog-Research.md) membedakan minimum per kanal, tarif maksimum versus aktual, payout, lot dan seri yang penawaran perdananya sudah ditutup. Tidak ada quote/histori/fee sintetis pada catalog produksi; semuanya tetap research/withheld sampai lengkap.
+- Curator ADMIN yang mempunyai akses Invest dapat menyimpan versi metadata dan observasi melalui form JSON/API. Audit actor tidak ikut dibagikan. Member meninjau akses kanal, pemahaman dan lock secara privat; review terikat versi catalog. Holding dapat dipetakan ke instrumen yang kelas/mata uangnya cocok.
+- Engine Decimal M3–M6 memeriksa profil, source rights, lifecycle/review, kanal, harga/NAB/FX, kalender sumber,36 bulan selesai dan coverage≥95%, biaya/minimum/lot, knowledge dan stress produk. Jalur kontraktual mempunyai pemeriksaan dokumen sendiri. Tanggal fetched tidak menggantikan market asOf. Valuasi manual maksimal24jam adalah aturan operasional konservatif yang dinyatakan eksplisit, bukan hasil kalibrasi pasar.
+- Alokasi menghitung pot lama+kontribusi, skala toleransi/capacity rupiah, kekurangan alokasi, pembulatan sen, unit dan biaya. Pot lama yang melampaui batas tidak ditutupi dengan tambahan kas. Cash fund terpetakan memerlukan stress sendiri; kas asing ditahan untuk review. Crypto dibatasi pada seluruh pot. Semua nominal yang dikeluarkan lolos stress termasuk biaya; hasil bukan janji batas kerugian pasar.
+- Ranking hanya dalam peer sebanding: COST/DIV/DATA/LIQ/ACCESS, tie-break deterministik, maksimal3 alternatif, near-tie<3 poin. Satu kandidat inti per kelas; pengguna dapat memilih alternatif dengan membuat evaluasi baru. Pilihan yang tidak lagi memenuhi gate/top3 tidak memaksa pembelian. Overlap tetap unknown, bukan klaim diversifikasi teruji.
+- Evaluasi PLAN/ACTUAL tersimpan immutable: input goal/profile/holdings/budget, versi catalog, pilihan peer/kandidat, aturan dan hasil. Arsip20 per halaman tersedia di `/app/reviews`; detail hasil di `/app/reviews/:id` (route PRD diselaraskan). Stale dihitung ulang dari revision dan hasil gate; arsip tidak ditimpa.
+- Reservasi hanya dari ACTUAL yang masih layak, mencakup seluruh kontribusi B (order+residu kas), TTL maksimal24jam. Settlement meminta bukti pembelian sudah terjadi dan sisa dana sudah dipisahkan. PURCHASE serta GOAL_SAVING menggantikan reservasi tepat sekali, atomis, tanpa debit bank. Snapshot/quote/input basi menahan settlement; fakta pembelian di luar rencana tetap dapat dicatat lewat ledger manual dengan alasan.
+- UI memakai source v3 Trackster yang sama, dukungan ID/EN, dua tema/density, form yang mempertahankan input, dan retry key saat respons hilang. Tidak ada update nominal optimistis atau LLM Invest pada tahap ini.
+
+### Penyimpanan dan kontrak
+
+Migrasi aditif `20261026140000_invest_market_evaluation` menambah `InvestInstrument` bersama; `InvestCatalogRevision` (actor audit), `InvestInstrumentAccess`, `InvestEvaluation` privat/berscope user. FK evaluasi→goal memakai user komposit. Tambahan `InvestHolding.instrumentId` serta `InvestReservation.plan/settledLedgerIds` hanya menyentuh tabel Invest. Identifier holding/access dapat menunjuk catatan built-in yang belum ditulis ke DB, sehingga tidak memakai FK instrument. Histori catalog dan snapshot immutable dipertahankan. Tidak ada perubahan kolom/row keuangan lama.
+
+API baru: GET `/invest/instruments` dan `/:id`; POST/PATCH `/invest/catalog/instruments`; POST `/:id/observations`; PUT `/invest/instruments/:id/access`, `/invest/holdings/:id/instrument`; POST/GET `/invest/evaluations` dan GET `/:id`; POST `/invest/reservations` serta `/:id/settle`. DTO/write contract dan instruksi kurasi ada di [README app](../../apps/invest/README.md). Rate berupa pecahan desimal, unknown tidak diisi0. POST menggunakan revision + idempotency key; catalog juga memakai expectedVersion. Feature flag global/crypto defaultfalse, tanpa menghapus gate saat diaktifkan.
+
+Migrasi ini dapat dipasangkan dengan kode lama karena seluruh tambahan aditif dan kolom lama tetap. Rollback kode menghentikan endpoint baru; jangan menghapus tabel/arsip yang sudah ditulis. Kompatibilitas tersebut ditinjau dari SQL, belum diuji sebagai pasangan image produksi lama+baru. Tidak ada migrasi produksi dijalankan.
+
+### Verifikasi dan temuan
+
+| Pemeriksaan | Hasil / batas bukti |
+| --- | --- |
+| Build/schema | Prisma valid; backend build dengan heap1536MB, Invest production build/typecheck, frontend Trackster `tsc --noEmit` lulus. Windows Node22.12.0, bukan klaim verifikasi image Node24 produksi. Build berat berurutan. |
+| Engine | Empat check Invest lulus. Check baru **1.240 assertion**: kalender/coverage/rights/age/fees/lot/crypto/pot lama/kapasitas rupiah, pilihan alternatif, urutan deterministik dan konservasi B pada300 anggaran sintetis. Check profil/accounting/budget sebelumnya tetap lulus. |
+| Database/API | **227 assertion** suite lulus pada Nest/Auth/Invest asli dan PostgreSQL17 loopback baru dengan seluruh48 migrasi. Isolasi dua akun+satu denied, curator/member, arsip/akses privat, extra-field rejection, versi sumber, pilihan alternatif, concurrent reserve/settle, replay, TTL/cancel, koreksi income dan golden keuangan lama identik. Tanpa cron/provider/akun nyata. |
+| Browser | **32 regresi I1 +31 alur I2 +30 alur I3**, lalu **8 pemeriksaan visual/arsip tambahan** lulus pada build production. I3 mencakup lost-response→retry, data riset ditahan, akses privat, pilihan alternatif membuat snapshot baru, reserve→settle, history, ID/EN, mobile390px/desktop1400px. Token/font/sidebar dibandingkan dengan `/demo` build Trackster lokal sebelumnya, source v3 tidak berubah. Tidak ada runtime error atau respons lokal5xx. |
+| Tenancy | Audit statis0temuan; tiga model privat ditambahkan ke daftar. `InvestInstrument` sengaja shared; actor audit dan akses pengguna tidak dibagikan melalui catalog. |
+| Dokumentasi | UTF-8 dan target tautan lokal diperiksa, diff whitespace bersih; artefak/gambar/log sintetis berada di `.artifacts/` yang diabaikan Git. |
+
+Dua masalah aplikasi ditemukan dan diperbaiki: global ValidationPipe lama semula menghapus unknown fields sebelum validasi strict; guard khusus market kini memeriksa raw DTO lebih dahulu tanpa mengubah API finansial lama. PostgreSQL JSONB mengubah urutan key sehingga snapshot yang sama semula tampak basi; equality sekarang mengkanonisasi key. Regresi API memeriksa kedua perilaku. Fixture TTL awal menyalahi constraint createdAt<expiresAt; fixture diperbaiki tanpa melonggarkan constraint. Pemeriksaan browser menunggu data asinkron dan font selesai sebelum menghitung isi/menangkap gambar. Encoding file yang sempat terkena default Windows diperbaiki dan diperiksa terhadap baseline.
+
+### Acceptance yang masih terbuka
+
+Inti I3 dan reserve→settle I2 kini tersedia lokal; ini **bukan kelulusan seluruh PRD**. AC-D4/data produk nyata masih terbuka: akses akun, tarif lengkap, hak pakai deployment, kalender/histori yang direkonsiliasi, dan stress spesifik belum terbukti. Catatan manual histori adalah attestasi dengan bukti, belum audit seri otomatis. Cakupan server saat ini memuat hingga1.000 record tersimpan ditambah built-in; perlu strategi skala sebelum universe luas.
+
+Sisa UI I3: detail instrumen mandiri, filter kelas/akses/gate dan perbandingan detail; saat ini identitas/sumber/gate ada di kartu Pasar/Sumber dan alternatif di detail evaluasi. I4 review perubahan pot/deviasi, acknowledgment review dan AI tervalidasi belum aktif. Riset lanjutan tetap mencakup kalibrasi profil risiko, pengujian alokasi, biaya/minimum, kualitas histori, evaluasi shortlist, konsistensi AI, serta rekonsiliasi jatah dengan portofolio. Receipt lintas bulan I1, arsip UI profil, kalibrasi/pilot V1–V7, produk nyata Indonesia/global/crypto dan release I5/I6 tetap pekerjaan berikutnya. Tidak ada feed harga/vendor, prediksi return, broker order, atau klaim rekomendasi nyata yang sudah teruji.
+
+Proses API, frontend dan PostgreSQL scratch milik sesi sudah dihentikan. Port3000/3001/4000/55439 diperiksa tidak mendengarkan; tidak ada data pribadi, perubahan DNS, migrasi produksi atau transaksi investasi nyata.
+
 ## 2026-10-26 — Import ke repository Invest
 
 Arzaka meminta seluruh source di-push ke `ArzakaRaffan/invest-trackster`. Snapshot disiapkan dalam checkout Git terpisah dengan frontend Invest, dependensi UI Trackster, backend, migrasi, pengujian, serta seluruh dokumentasi publik. Asal snapshot, pengecualian file lokal, dan guard pipeline dijelaskan di [07-Repository.md](07-Repository.md). Ini publikasi source; status fitur tetap I0/I1 dan inti I2, bukan rilis produksi atau penyelesaian I3–I6.
