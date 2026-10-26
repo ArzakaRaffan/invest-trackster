@@ -1,0 +1,44 @@
+// Called only by the fresh-loopback synthetic API harness, before its fixture cleanup.
+import { randomUUID } from 'node:crypto';
+export async function reviewChecks({ prisma, request, eq, get, write, cookieA, cookieB, a, evaluation, instrumentId, quote }) {
+  const path = `/invest/reviews?evaluationId=${evaluation.id}`;
+  const review = async () => (await request(path, { cookie: cookieA })).body.items[0];
+  const privatePath = `/invest/reviews/${evaluation.id}/acknowledge`;
+  const r = await review();
+  eq(r.status, 'NEEDS_REVIEW', 'settlement changes prompt review');
+  eq(r.reasons.includes('HOLDINGS_CHANGED'), true, 'realized holdings diff');
+  eq(r.reasons.includes('BUDGET_CHANGED'), true, 'quota diff');
+  eq(r.drift.length, 4, 'whole existing pot compared against saved targets');
+  eq((await request(path, { cookie: cookieB })).status, 404, 'foreign review hidden');
+  eq((await request('/invest/reviews', { cookie: cookieB })).body.items, [], 'review list private');
+  eq((await request(`/invest/reviews?cursor=${evaluation.id}`, { cookie: cookieB })).status, 404, 'foreign review cursor hidden');
+  const payload = { reviewKey: r.reviewKey, note: 'Synthetic review only, no trade', confirmed: true };
+  eq((await write(privatePath, payload, 'POST', cookieB)).status, 404, 'foreign acknowledgment hidden');
+  eq((await write(privatePath, { ...payload, userId: 123 })).status, 400, 'review identity override rejected');
+  eq((await write(privatePath, { ...payload, reviewKey: '0'.repeat(64) })).status, 409, 'wrong review key rejected');
+  const financial = async () => JSON.stringify(await Promise.all(['income','bankBalance','dailyBudget','investLedger','investReservation','investHolding','investEvaluation','investMonth'].map(model => prisma[model].findMany({ orderBy: { id: 'asc' } }))));
+  const before = await financial(), revision = (await get()).revision;
+  const requestBody = { ...payload, expectedRevision: revision, idempotencyKey: randomUUID() };
+  const twins = await Promise.all([1,2].map(() => request(privatePath, { method: 'POST', cookie: cookieA, body: requestBody })));
+  eq(twins.map(r => r.status), [201,201], 'concurrent acknowledgment replay');
+  eq(twins[0].body, twins[1].body, 'one acknowledgment result');
+  eq((await write(privatePath, payload)).body, twins[0].body, 'new key on same review also reuses acknowledgment');
+  eq(await prisma.investChange.count({ where: { userId: a.id, entityId: evaluation.id, kind: 'REVIEW_ACK' } }), 1, 'exactly one audit record for same review');
+  eq((await review()).status, 'ACKNOWLEDGED', 'review survives reloading');
+  eq((await get()).revision, revision, 'acknowledgment does not invalidate cash or change portfolio revision');
+  eq(await financial(), before, 'review cannot mutate financial rows or immutable evaluations');
+  eq((await request(`/invest/evaluations/${evaluation.id}`, { cookie: cookieA })).body.canReserve, false, 'acknowledgment never unlocks stale or settled evaluation');
+  eq((await write(`/invest/catalog/instruments/${instrumentId}/observations`, { expectedVersion: 1, quote })).status, 201, 'new source after review');
+  const changed = await review();
+  eq(changed.status, 'NEEDS_REVIEW', 'new source invalidates previous acknowledgment');
+  eq(changed.reasons.includes('SOURCE_CHANGED'), true, 'changed source explanation');
+  eq((await request('/invest/instruments?access=STALE', { cookie: cookieA })).body.items.some(i => i.id === instrumentId), true, 'access filter exposes version-stale review');
+  eq((await write(privatePath, payload)).status, 409, 'cannot acknowledge the previous view with a fresh revision');
+  eq((await request(privatePath, { method: 'POST', cookie: cookieA, body: requestBody })).body, twins[0].body, 'lost-response replay returns original even after source change');
+  const revised = { ...payload, reviewKey: changed.reviewKey, expectedRevision: (await get()).revision };
+  const races = await Promise.all([1,2].map(() => request(privatePath, { method: 'POST', cookie: cookieA, body: { ...revised, idempotencyKey: randomUUID() } })));
+  eq(races.map(r => r.status), [201,201], 'different-key concurrent review acknowledgments both complete');
+  eq(races[0].body, races[1].body, 'different keys still produce one acknowledgment per live view');
+  eq(await prisma.investChange.count({ where: { userId: a.id, entityId: evaluation.id, kind: 'REVIEW_ACK' } }), 2, 'two distinct reviewed views retain two immutable audit records');
+  eq((await request(`/invest/evaluations/${evaluation.id}`, { cookie: cookieA })).body.result, evaluation.result, 'review and source updates preserve archived result');
+}

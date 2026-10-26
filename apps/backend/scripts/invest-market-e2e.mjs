@@ -25,6 +25,17 @@ export async function marketChecks({ prisma, request, eq, a, b, cookieA, cookieB
     eq((await write(`/invest/instruments/${id}/access`, { status: 'ACTIVE', understood: true, acceptsLock: false }, 'PUT')).status, 200, 'private access review');
   }
   const foreignCatalog = await request('/invest/instruments', { cookie: cookieB }); eq(foreignCatalog.body.items.filter(i => ids.includes(i.id)).every(i => i.access == null), true, 'private access never shared');
+  eq((await request('/invest/instruments?assetClass=BONDS&search=Synthetic', { cookie: cookieA })).body.items.map(i => i.id), [ids[0]], 'class and search filters combine');
+  eq((await request('/invest/instruments?gate=ELIGIBLE', { cookie: cookieA })).body.items.length, 3, 'eligibility filtering uses own profile/access');
+  eq((await request('/invest/instruments?gate=ELIGIBLE', { cookie: cookieB })).body.items.length, 0, 'foreign access never makes products eligible');
+  eq((await request('/invest/instruments?access=ACTIVE', { cookie: cookieB })).body.items.length, 0, 'access filtering private');
+  eq((await request('/invest/instruments?assetClass=INVALID', { cookie: cookieA })).status, 400, 'invalid filter rejected');
+  const comparison = await request(`/invest/instruments/compare?ids=${ids[1]},${ids[2]}`, { cookie: cookieA });
+  eq(comparison.status, 200, 'same-peer comparison'); eq(comparison.body.items.map(i => i.id), ids.slice(1), 'comparison retains requested columns');
+  eq((await request(`/invest/instruments/compare?ids=${ids[0]},${ids[1]}`, { cookie: cookieA })).status, 422, 'cross-peer comparison rejected');
+  eq((await request(`/invest/instruments/compare?ids=${ids[1]},${ids[1]}`, { cookie: cookieA })).status, 400, 'duplicate comparison rejected');
+  eq((await request(`/invest/instruments/compare?ids=${ids[1]},missing`, { cookie: cookieA })).status, 404, 'missing comparison instrument');
+  eq((await request(`/invest/instruments/compare?ids=${ids[0]},${ids[1]},${ids[2]},extra`, { cookie: cookieA })).status, 400, 'comparison bounded to3');
   const invalidFacts = marketFacts(); invalidFacts.quote.price = '-1'; eq((await write('/invest/catalog/instruments', { instrumentId: 'synthetic-invalid', expectedVersion: 0, facts: invalidFacts })).status, 400, 'negative quote rejected');
   invalidFacts.quote.price = '100'; invalidFacts.sources[0].store = false; eq((await write('/invest/catalog/instruments', { instrumentId: 'synthetic-invalid', expectedVersion: 0, facts: invalidFacts })).status, 422, 'unlicensed quote not stored');
   eq((await write('/invest/evaluations', { month, goalId, mode: 'ACTUAL', peers: [], userId: b.id })).status, 400, 'identity override rejected');
@@ -84,6 +95,8 @@ export async function marketChecks({ prisma, request, eq, a, b, cookieA, cookieB
   eq(after.holdings.length, 2, 'realized units linked to two sourced instruments');
   eq((await request(`/invest/evaluations/${e.body.id}`, { cookie: cookieA })).body.canReserve, false, 'settled snapshot cannot reserve again');
   eq(await legacy(), before, 'I3 does not mutate legacy Income/BankBalance/DailyBudget');
+  const { reviewChecks } = await import('./invest-review-e2e.mjs');
+  await reviewChecks({ prisma, request, eq, get, write, cookieA, cookieB, a, evaluation: e.body, instrumentId: ids[0], quote: marketFacts('BONDS').quote });
   const where = { userId: { in: [a.id,b.id] } };
   for (const model of ['investEvaluation','investInstrumentAccess','investCatalogRevision','investMutation','investChange','investReservation','investLedger','investHolding','investRiskProfile','investGoal','investMonth']) await prisma[model].deleteMany({ where });
   await prisma.investInstrument.deleteMany({ where: { id: { in: ids } } });

@@ -140,4 +140,20 @@ export class InvestMarketQuery {
   @IsOptional() @Matches(id) cursor?: string;
   @IsOptional() @IsIn(['INDONESIA', 'GLOBAL', 'CRYPTO']) region?: string;
   @IsOptional() @IsString() @MaxLength(100) search?: string;
+  @IsOptional() @IsIn(['CASH', 'BONDS', 'EQUITY', 'CRYPTO']) assetClass?: Asset;
+  @IsOptional() @IsIn(['ELIGIBLE', 'WITHHELD']) gate?: string;
+  @IsOptional() @IsIn(['UNKNOWN', 'ACTIVE', 'FUNDING_REQUIRED', 'STALE']) access?: string;
+  @IsOptional() @IsString() @MaxLength(300) peer?: string;
+}
+export class InvestCompareQuery {
+  @Matches(/^[a-zA-Z0-9_-]{1,80}(,[a-zA-Z0-9_-]{1,80}){1,2}$/) ids: string;
+}
+export class InvestReviewQuery {
+  @IsOptional() @Matches(id) cursor?: string;
+  @IsOptional() @Matches(id) evaluationId?: string;
+}
+export class InvestReviewAckDto extends InvestWriteDto {
+  @Matches(/^[a-f0-9]{64}$/) reviewKey: string;
+  @Equals(true) confirmed: boolean;
+  @IsString() @Matches(/\S/) @MaxLength(300) note: string;
 }

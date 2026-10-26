@@ -3,21 +3,20 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AuthUser } from '../../common/decorators/current-user.decorator';
 import { wibDateKey } from '../../common/wib';
-import { fingerprint, InvestDecimal as D, INVEST_RULESET, money, validDate } from './invest-budget';
+import { InvestDecimal as D, INVEST_RULESET, money, validDate } from './invest-budget';
 import { holdingQuantity } from './invest-accounting';
 import { evaluateProfile, RiskAnswers } from './invest-profile';
 import { InvestPortfolioService } from './invest-portfolio.service';
 import { InvestService } from './invest.service';
 import { RESEARCH_CATALOG } from './invest-catalog';
 import { checkFullPot, eligibility, EngineInput, evaluateInvest, Instrument, Order, peerKey, PotHolding, quoteReasons } from './invest-engine';
-import { InvestAccessDto, InvestCatalogDto, InvestEvaluationDto, InvestFactsDto, InvestHoldingInstrumentDto, InvestMarketQuery, InvestObservationDto, InvestReserveDto, InvestSettleDto } from './invest-market.dto';
+import { InvestAccessDto, InvestCatalogDto, InvestEvaluationDto, InvestFactsDto, InvestHoldingInstrumentDto, InvestMarketQuery, InvestReviewQuery, InvestReviewAckDto, InvestObservationDto, InvestReserveDto, InvestSettleDto } from './invest-market.dto';
+
+import { buildReview, ReviewBaseline, snapshotHash } from './invest-review';
 
 type Tx = Prisma.TransactionClient;
 type State = Awaited<ReturnType<InvestPortfolioService['state']>>;
 const json = (v: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(v));
-// PostgreSQL JSONB reorders object keys. Snapshot equality must not depend on that order.
-const snapshotHash = (v: unknown): string => fingerprint(JSON.parse(JSON.stringify(v), (_key, value) => value != null && typeof value === 'object' && !Array.isArray(value)
-  ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : value));
 const ENGINE = 'invest-engine-v0.1.0';
 const invalid = (message: string): never => { throw new UnprocessableEntityException(message); };
 
@@ -67,15 +66,29 @@ export class InvestMarketService {
     return { input, goal, snapshot, catalogRevision: snapshotHash([ENGINE, instruments, input.globalEnabled, input.cryptoEnabled]), profileId: p?.id ?? null };
   }
 
-  market(user: AuthUser, query: InvestMarketQuery = {}, id?: string) {
+  market(user: AuthUser, query: InvestMarketQuery = {}, id?: string, compareIds?: string[]) {
     return this.prisma.$transaction(async tx => {
       const s = await this.portfolio.state(tx, user.id), goal = s.goals.find(g => g.status === 'ACTIVE');
       const ctx = await this.context(tx, user.id, s, goal?.id ?? null, wibDateKey(s.now).slice(0, 7), 'ACTUAL');
-      let list = ctx.input.instruments.filter(i => (!query.region || i.facts.region === query.region) && (!query.search || `${i.facts.name} ${i.facts.issuer}`.toLowerCase().includes(query.search.toLowerCase())));
-      if (id) { list = list.filter(i => i.id === id); if (!list.length) throw new NotFoundException('Instrumen tidak ditemukan'); }
+      const all = ctx.input.instruments.map(i => {
+        const a = s.access.find(a => a.instrumentId === i.id);
+        const access = a ? { status: a.status, understood: a.understood, acceptsLock: a.acceptsLock, reviewedAt: a.reviewedAt, instrumentVersion: a.instrumentVersion } : null;
+        const accessState = !a ? 'UNKNOWN' : a.instrumentVersion !== i.version || s.now.getTime() - a.reviewedAt.getTime() > 90 * 86400000 ? 'STALE' : a.status;
+        return { ...i, peer: peerKey(i.facts), reasons: eligibility(i, ctx.input), access, accessState };
+      });
+      let list = all.filter(i => (!query.region || i.facts.region === query.region) && (!query.assetClass || i.facts.assetClass === query.assetClass)
+        && (!query.search || `${i.facts.name} ${i.facts.issuer} ${i.facts.channel}`.toLowerCase().includes(query.search.trim().toLowerCase()))
+        && (!query.peer || i.peer === query.peer) && (!query.access || i.accessState === query.access)
+        && (!query.gate || (query.gate === 'ELIGIBLE' ? !i.reasons.length : !!i.reasons.length)));
+      if (id) { list = all.filter(i => i.id === id); if (!list.length) throw new NotFoundException('Instrumen tidak ditemukan'); }
+      if (compareIds) {
+        if (new Set(compareIds).size !== compareIds.length) throw new BadRequestException('Pilih instrumen yang berbeda');
+        list = compareIds.map(id => { const item = all.find(i => i.id === id); if (!item) throw new NotFoundException('Instrumen tidak ditemukan'); return item; });
+        if (new Set(list.map(i => i.peer)).size !== 1) invalid('Perbandingan harus dalam jenis, kelompok, eksposur, mata uang, dan tenor yang sama');
+      }
       const start = query.cursor ? list.findIndex(i => i.id === query.cursor) + 1 : 0;
       if (query.cursor && !start) throw new NotFoundException('Cursor tidak ditemukan');
-      const items = list.slice(start, start + 50).map(i => ({ ...i, peer: peerKey(i.facts), reasons: eligibility(i, ctx.input), access: s.access.find(a => a.instrumentId === i.id) ? (() => { const a = s.access.find(a => a.instrumentId === i.id)!; return { status: a.status, understood: a.understood, acceptsLock: a.acceptsLock, reviewedAt: a.reviewedAt, instrumentVersion: a.instrumentVersion }; })() : null }));
+      const items = list.slice(start, start + 50);
       return { revision: s.revision, asOf: s.now.toISOString(), canWriteCatalog: user.role === 'ADMIN', items, nextCursor: start + 50 < list.length ? items.at(-1)!.id : null,
         peers: [...new Set(ctx.input.instruments.filter(i => i.facts.assetClass !== 'CASH').map(i => peerKey(i.facts)))].sort().map(peer => { const i = ctx.input.instruments.find(i => peerKey(i.facts) === peer)!; return { peer, assetClass: i.facts.assetClass, label: `${i.facts.exposure} · ${i.facts.kind} · ${i.facts.currency} · ${i.facts.tenorBand}` }; }),
         coverage: { total: ctx.input.instruments.length, matched: list.length, indonesia: 'PARTIAL_MANUAL', global: ctx.input.globalEnabled ? 'GATED' : 'RESEARCH_ONLY', crypto: ctx.input.cryptoEnabled ? 'GATED' : 'RESEARCH_ONLY' }, ruleset: INVEST_RULESET };
@@ -112,6 +125,7 @@ export class InvestMarketService {
       const old = await tx.investInstrument.findUnique({ where: { id: dto.instrumentId } });
       if ((old?.version ?? 0) !== dto.expectedVersion) throw new ConflictException('Versi catalog berubah');
       if (!old && await tx.investInstrument.count() >= 1000) invalid('Maksimal1000 catatan catalog manual');
+      if (!old && await tx.investInstrument.count() >= 1000) invalid('Batas1000 catatan tercapai; perluas kapasitas sebelum menambah catalog');
       const version = (old?.version ?? 0) + 1, facts = json(dto.facts);
       if (old) await tx.investInstrument.update({ where: { id: old.id }, data: { facts, version } });
       else await tx.investInstrument.create({ data: { id: dto.instrumentId, facts, version } });
@@ -186,6 +200,42 @@ export class InvestMarketService {
       const rows = await tx.investEvaluation.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 21, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, month: true, mode: true, ruleset: true, createdAt: true, result: true } });
       return { items: rows.slice(0, 20).map(r => ({ ...r, result: { status: (r.result as any).status, budgetIDR: (r.result as any).budgetIDR } })), nextCursor: rows.length > 20 ? rows[19].id : null };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  private async review(tx: Tx, userId: number, s: State, e: Prisma.InvestEvaluationGetPayload<{}>, ctx?: Awaited<ReturnType<InvestMarketService['context']>>) {
+    if (e.mode !== 'ACTUAL') invalid('Review memakai evaluasi aktual');
+    ctx ??= await this.context(tx, userId, s, e.goalId, wibDateKey(s.now).slice(0, 7), 'ACTUAL');
+    const result = buildReview(e as unknown as ReviewBaseline, { input: ctx.input, budget: ctx.snapshot.summary, revision: s.revision, catalogRevision: ctx.catalogRevision, profileId: ctx.profileId, goalVersion: ctx.goal!.version, engine: ENGINE });
+    const ack = await tx.investChange.findFirst({ where: { userId, entityId: e.id, kind: 'REVIEW_ACK', snapshot: { path: ['reviewKey'], equals: result.reviewKey } }, orderBy: { createdAt: 'desc' } });
+    return { ...result, id: e.id, goalId: e.goalId, goalName: ctx.goal!.name, baselineAt: e.createdAt, baselineMonth: e.month, asOf: s.now.toISOString(), revision: s.revision,
+      status: ack ? 'ACKNOWLEDGED' : result.reasons.length ? 'NEEDS_REVIEW' : 'NO_CHANGE', acknowledgment: ack ? { id: ack.id, at: ack.createdAt, note: (ack.snapshot as any).note } : null };
+  }
+
+  reviews(userId: number, query: InvestReviewQuery) {
+    return this.prisma.$transaction(async tx => {
+      const s = await this.portfolio.state(tx, userId);
+      if (query.cursor && !await tx.investEvaluation.findFirst({ where: { userId, id: query.cursor, mode: 'ACTUAL' } })) throw new NotFoundException('Cursor tidak ditemukan');
+      const rows = await tx.investEvaluation.findMany({ where: { userId, mode: 'ACTUAL', ...(query.evaluationId ? { id: query.evaluationId } : {}) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 11, ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}) });
+      if (query.evaluationId && !rows.length) throw new NotFoundException('Evaluasi aktual tidak ditemukan');
+      const contexts = new Map<string, Awaited<ReturnType<InvestMarketService['context']>>>(), items: Awaited<ReturnType<InvestMarketService['review']>>[] = [];
+      for (const e of rows.slice(0, 10)) {
+        if (!contexts.has(e.goalId)) contexts.set(e.goalId, await this.context(tx, userId, s, e.goalId, wibDateKey(s.now).slice(0, 7), 'ACTUAL'));
+        items.push(await this.review(tx, userId, s, e, contexts.get(e.goalId)));
+      }
+      return { items, nextCursor: rows.length > 10 ? rows[9].id : null };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 20000 });
+  }
+
+  acknowledge(userId: number, id: string, dto: InvestReviewAckDto) {
+    return this.portfolio.write(userId, `review/${id}`, dto, async (tx, s) => {
+      const e = await tx.investEvaluation.findFirst({ where: { userId, id } });
+      if (!e) throw new NotFoundException('Evaluasi tidak ditemukan');
+      const result = await this.review(tx, userId, s, e);
+      if (result.reviewKey !== dto.reviewKey) throw new ConflictException('Keadaan review berubah; periksa hasil terbaru');
+      if (result.acknowledgment) return result.acknowledgment;
+      const ack = await tx.investChange.create({ data: { userId, entityId: id, kind: 'REVIEW_ACK', snapshot: json({ ...result, note: dto.note }) } });
+      return { id: ack.id, at: ack.createdAt, note: dto.note };
+    });
   }
 
   reserve(userId: number, dto: InvestReserveDto) {

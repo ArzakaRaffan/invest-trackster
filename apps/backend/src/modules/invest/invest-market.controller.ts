@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { InvestAccessGuard } from './invest-access.guard';
 import { InvestPayloadGuard } from './invest-payload.guard';
 import { InvestMarketService } from './invest-market.service';
-import { InvestAccessDto, InvestCatalogDto, InvestEvaluationDto, InvestHoldingInstrumentDto, InvestMarketQuery, InvestObservationDto, InvestReserveDto, InvestSettleDto } from './invest-market.dto';
+import { InvestAccessDto, InvestCatalogDto, InvestEvaluationDto, InvestHoldingInstrumentDto, InvestMarketQuery, InvestCompareQuery, InvestReviewQuery, InvestReviewAckDto, InvestObservationDto, InvestReserveDto, InvestSettleDto } from './invest-market.dto';
 
 @Controller('invest')
 @UseGuards(JwtAuthGuard, InvestAccessGuard, InvestPayloadGuard)
@@ -12,6 +12,7 @@ import { InvestAccessDto, InvestCatalogDto, InvestEvaluationDto, InvestHoldingIn
 export class InvestMarketController {
   constructor(private readonly market: InvestMarketService) {}
   @Get('instruments') instruments(@CurrentUser() user: AuthUser, @Query() query: InvestMarketQuery) { return this.market.market(user, query); }
+  @Get('instruments/compare') compare(@CurrentUser() user: AuthUser, @Query() query: InvestCompareQuery) { return this.market.market(user, {}, undefined, query.ids.split(',')); }
   @Get('instruments/:id') instrument(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.market.market(user, {}, id); }
   @Post('catalog/instruments') create(@CurrentUser() user: AuthUser, @Body() dto: InvestCatalogDto) { return this.market.saveCatalog(user, dto); }
   @Patch('catalog/instruments/:id') update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: InvestCatalogDto) { return this.market.saveCatalog(user, dto, id); }
@@ -21,6 +22,8 @@ export class InvestMarketController {
   @Post('evaluations') evaluate(@CurrentUser() user: AuthUser, @Body() dto: InvestEvaluationDto) { return this.market.evaluate(user.id, dto); }
   @Get('evaluations') evaluations(@CurrentUser() user: AuthUser, @Query() q: InvestMarketQuery) { return this.market.evaluations(user.id, undefined, q.cursor); }
   @Get('evaluations/:id') evaluation(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.market.evaluations(user.id, id); }
+  @Get('reviews') reviews(@CurrentUser() user: AuthUser, @Query() query: InvestReviewQuery) { return this.market.reviews(user.id, query); }
+  @Post('reviews/:id/acknowledge') acknowledge(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: InvestReviewAckDto) { return this.market.acknowledge(user.id, id, dto); }
   @Post('reservations') reserve(@CurrentUser() user: AuthUser, @Body() dto: InvestReserveDto) { return this.market.reserve(user.id, dto); }
   @Post('reservations/:id/settle') settle(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: InvestSettleDto) { return this.market.settle(user.id, id, dto); }
 }
