@@ -22,9 +22,9 @@ export class InvestService {
       const profile = goal && p ? evaluateProfile({ goal, answers: p.answers as RiskAnswers, now, cashValid: summary.freeCash !== null,
         confirmedAt: p.confirmedAt, profileGoalVersion: p.goalVersion, conflictsAcknowledged: p.conflictsAcknowledged }) : null;
       const holdingsKnown = goal?.holdingsDeclaration === 'EMPTY' || goal?.holdingsDeclaration === 'ENTERED' && await tx.investHolding.count({ where: { userId, goalId: goal.id } }) > 0;
-      return { enabled: true, ruleset: INVEST_RULESET, phase: 'I2', activeGoalId: goal?.id ?? null, setupComplete: !!holdingsKnown && profile?.status === 'READY',
-      capabilities: { monthlyBudget: true, cashConfirmation: true, paymentReconciliation: true, profiles: true, portfolio: true, ledger: true, evaluations: false, reservations: false, ai: false },
-      coverage: { indonesia: 'NOT_CONFIGURED', global: 'RESEARCH_ONLY', crypto: 'RESEARCH_ONLY' } };
+      return { enabled: true, ruleset: INVEST_RULESET, phase: 'I3', activeGoalId: goal?.id ?? null, setupComplete: !!holdingsKnown && profile?.status === 'READY',
+      capabilities: { monthlyBudget: true, cashConfirmation: true, paymentReconciliation: true, profiles: true, portfolio: true, ledger: true, evaluations: true, reservations: true, ai: false },
+      coverage: { indonesia: 'PARTIAL_MANUAL', global: process.env.INVEST_GLOBAL_ENABLED === 'true' ? 'GATED' : 'RESEARCH_ONLY', crypto: process.env.INVEST_CRYPTO_ENABLED === 'true' ? 'GATED' : 'RESEARCH_ONLY' } };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
@@ -55,7 +55,7 @@ export class InvestService {
     // Fingerprints are recomputed from live source facts: Income edits/deletes/resolve invalidate
     // an Invest result without changing legacy write paths or mutating bank balances.
     const revision = fingerprint([INVEST_RULESET, financialRevision, streams, overrides, cash, linkedReceipts, ledger, reservations, status, summary.events.map(e => [e.eventKey, e.status, e.received])]);
-    return { summary: { ...summary, ...accounting, status, capability: 'MANUAL_PORTFOLIO', cashConfirmation: summary.cashConfirmation ? { ...summary.cashConfirmation, valid: summary.cashConfirmation.valid && !accounting.cashBackdated } : null, revision }, financialRevision, stored, receipts, ledgerIds: ledger.map(l => l.id), activeGoal };
+    return { summary: { ...summary, ...accounting, status, canEvaluate: !!activeGoal, capability: 'SOURCED_EVALUATION', cashConfirmation: summary.cashConfirmation ? { ...summary.cashConfirmation, valid: summary.cashConfirmation.valid && !accounting.cashBackdated } : null, revision }, financialRevision, stored, receipts, ledgerIds: ledger.map(l => l.id), activeGoal };
   }
 
   budget(userId: number, month = wibDateKey(new Date()).slice(0, 7)) {

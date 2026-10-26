@@ -78,6 +78,9 @@ model User {
   investReservations InvestReservation[]
   investMutations    InvestMutation[]
   investChanges      InvestChange[]
+  investCatalogRevisions InvestCatalogRevision[]
+  investAccess       InvestInstrumentAccess[]
+  investEvaluations  InvestEvaluation[]
 }
 
 enum InvestGoalStatus {
@@ -130,6 +133,7 @@ model InvestGoal {
   holdings            InvestHolding[]
   ledger              InvestLedger[]
   reservations        InvestReservation[]
+  evaluations         InvestEvaluation[]
 
   // One ACTIVE per user is additionally enforced by a partial unique index in the migration.
   @@unique([id, userId])
@@ -163,6 +167,7 @@ model InvestHolding {
   goal            InvestGoal        @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
   label           String            @db.VarChar(100)
   assetClass      InvestAssetClass
+  instrumentId    String?
   currency        String            @db.VarChar(3)
   mode            InvestHoldingMode
   openingQuantity Decimal?          @db.Decimal(28, 12)
@@ -228,12 +233,68 @@ model InvestReservation {
   evaluationId    String
   inputRevision   String                  @db.VarChar(64)
   amountIDR       Decimal                 @db.Decimal(18, 2)
+  plan            Json?
+  settledLedgerIds String[]              @default([])
   status          InvestReservationStatus @default(ACTIVE)
   expiresAt       DateTime
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
   @@index([userId, allocationMonth, status])
+}
+
+// Shared source facts; writes require ADMIN plus Invest access. No private account access in facts.
+model InvestInstrument {
+  id String @id @db.VarChar(80)
+  version Int @default(1)
+  facts Json
+  updatedAt DateTime @updatedAt
+  revisions InvestCatalogRevision[]
+}
+
+model InvestCatalogRevision {
+  id String @id @default(cuid())
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  instrumentId String
+  instrument InvestInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  version Int
+  facts Json
+  createdAt DateTime @default(now())
+  @@unique([instrumentId, version])
+  @@index([userId, instrumentId])
+}
+
+model InvestInstrumentAccess {
+  id String @id @default(cuid())
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  instrumentId String @db.VarChar(80)
+  instrumentVersion Int
+  status String @db.VarChar(30)
+  understood Boolean
+  acceptsLock Boolean
+  reviewedAt DateTime @default(now())
+  @@unique([userId, instrumentId])
+}
+
+model InvestEvaluation {
+  id String @id @default(cuid())
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goalId String
+  goal InvestGoal @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
+  month String @db.VarChar(7)
+  mode String @db.VarChar(10)
+  ruleset String
+  inputRevision String @db.VarChar(64)
+  financialRevision String @db.VarChar(64)
+  catalogRevision String @db.VarChar(64)
+  input Json
+  result Json
+  createdAt DateTime @default(now())
+  @@unique([id, userId])
+  @@index([userId, createdAt, id])
 }
 
 model InvestMutation {

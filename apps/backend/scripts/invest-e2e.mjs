@@ -56,6 +56,17 @@ async function login(username) {
 const month = wibDateKey(new Date()).slice(0, 7);
 const path = `/invest/budget?month=${month}`;
 let a, b, c, sa, sb, receiptA, cookieA, cookieB;
+// Restart only the previously generated three-account synthetic fixture after a build.
+if (process.argv.includes('--serve-existing')) {
+  try {
+    const users = await prisma.user.findMany({ select: { id: true, username: true } });
+    assert.deepEqual(users.map(u => u.username).sort(), ['invest_test_a', 'invest_test_b', 'invest_test_denied']);
+    process.env.INVEST_USER_IDS = users.filter(u => u.username !== 'invest_test_denied').map(u => u.id).join(',');
+    console.log(`Existing synthetic test API ready on http://localhost:${port}; stop with Ctrl+C.`);
+    await new Promise(resolve => { process.on('SIGINT', resolve); process.on('SIGTERM', resolve); });
+  } finally { await app.close(); }
+  process.exit(0);
+}
 try {
   eq(await prisma.user.count(), 0, 'use a NEW scratch database; never overwrite existing data');
   const password = await bcrypt.hash('synthetic-invest-only', 12);
@@ -138,6 +149,8 @@ try {
   await prisma.income.update({ where: { id: pending.id }, data: { description: 'Synthetic receipt for browser QA', amount: '625000.25' } });
   const { portfolioChecks } = await import('./invest-portfolio-e2e.mjs');
   await portfolioChecks({ prisma, request, eq, a, b, cookieA, cookieB: await login(b.username), month });
+  const { marketChecks } = await import('./invest-market-e2e.mjs');
+  await marketChecks({ prisma, request, eq, a, b, cookieA, cookieB: await login(b.username), month });
   console.log(`PASS: ${checks} Invest API assertions; tenant isolation, source revisions, serializable writes, shared auth/CORS, and unchanged legacy rows.`);
   if (process.argv.includes('--serve')) {
     console.log(`Synthetic test API ready on http://localhost:${port}; fixture user invest_test_a; stop with Ctrl+C.`);

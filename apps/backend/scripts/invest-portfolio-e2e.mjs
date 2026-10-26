@@ -103,7 +103,7 @@ export async function portfolioChecks({ prisma, request, eq, a, b, cookieA, cook
   const expired = await prisma.investReservation.create({ data: { userId: a.id, goalId, allocationMonth: month, evaluationId: 'expired-synthetic', inputRevision: 'b'.repeat(64), amountIDR: '1000', createdAt: new Date(Date.now() - 7200000), expiresAt: new Date(Date.now() - 3600000) } });
   eq((await get()).reservations.find(r => r.id === expired.id).effectiveStatus, 'EXPIRED', 'TTL effective expiry');
   eq((await get()).budget.reservations, '0.00', 'expired no quota lock');
-  eq((await request('/invest/reservations', { method: 'POST', cookie: cookieA, body: { amount: '1', mode: 'PLAN' } })).status, 404, 'no client-manufactured reservation before server evaluations');
+  eq((await request('/invest/reservations', { method: 'POST', cookie: cookieA, body: { amount: '1', mode: 'PLAN' } })).status, 400, 'client cannot manufacture reservation amounts or PLAN reservations');
   eq((await write(`/invest/goals/${draftGoal.body.id}`, { ...goalBody, name: 'Synthetic second goal', expectedVersion: 1 }, 'PATCH')).status, 200, 'active switch after cancellation');
   eq((await get()).goals.filter(g => g.status === 'ACTIVE').length, 1, 'single active enforced');
   let firstGoal = (await get()).goals.find(g => g.id === goalId);

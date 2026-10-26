@@ -21,6 +21,7 @@ const TENANT = [
   'aiMemory', 'apiToken', 'inboundAddress', 'ownAccount', 'aiUsage',
   'investMonth', 'investPaymentEvent', 'investReceiptLink', 'investEventAudit',
   'investGoal', 'investRiskProfile', 'investHolding', 'investLedger', 'investReservation', 'investMutation', 'investChange',
+  'investCatalogRevision', 'investInstrumentAccess', 'investEvaluation',
 ];
 const OPS = [
   'findMany', 'findFirst', 'findFirstOrThrow', 'findUnique', 'findUniqueOrThrow', 'create', 'createMany',

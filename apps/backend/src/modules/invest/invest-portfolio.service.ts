@@ -19,16 +19,18 @@ const invalid = (message: string): never => { throw new UnprocessableEntityExcep
 export class InvestPortfolioService {
   constructor(private readonly prisma: PrismaService, private readonly invest: InvestService) {}
 
-  private async state(tx: Tx, userId: number, now = new Date()) {
-    const [goals, holdings, ledger, reservations, budget] = await Promise.all([
+  async state(tx: Tx, userId: number, now = new Date()) {
+    const [goals, holdings, ledger, reservations, budget, access, catalogVersions] = await Promise.all([
       tx.investGoal.findMany({ where: { userId }, include: { profiles: { orderBy: { version: 'desc' }, take: 1 } }, orderBy: { id: 'asc' } }),
       tx.investHolding.findMany({ where: { userId }, orderBy: { id: 'asc' } }),
       tx.investLedger.findMany({ where: { userId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
       tx.investReservation.findMany({ where: { userId }, orderBy: { id: 'asc' } }),
       this.invest.snapshot(tx, userId, wibDateKey(now).slice(0, 7), now),
+      tx.investInstrumentAccess.findMany({ where: { userId }, orderBy: { instrumentId: 'asc' } }),
+      tx.investInstrument.findMany({ select: { id: true, version: true }, orderBy: { id: 'asc' } }),
     ]);
-    const revision = fingerprint([goals, holdings, ledger, reservations, budget.summary.revision]);
-    return { goals, holdings, ledger, reservations, budget: budget.summary, revision, now };
+    const revision = fingerprint([goals, holdings, ledger, reservations, budget.summary.revision, access, catalogVersions]);
+    return { goals, holdings, ledger, reservations, budget: budget.summary, revision, now, access };
   }
 
   private goal(goals: InvestGoal[], id: string) {
@@ -49,7 +51,7 @@ export class InvestPortfolioService {
     await tx.investChange.create({ data: { userId, entityId, kind, snapshot: json(snapshot) } });
   }
 
-  private async write(userId: number, route: string, dto: InvestWriteDto, action: (tx: Tx, state: Awaited<ReturnType<InvestPortfolioService['state']>>) => Promise<unknown>) {
+  async write(userId: number, route: string, dto: InvestWriteDto, action: (tx: Tx, state: Awaited<ReturnType<InvestPortfolioService['state']>>) => Promise<unknown>) {
     const bodyHash = fingerprint(canonical(dto));
     // Retry transaction conflicts, but never retry with a different user revision or payload.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -207,7 +209,7 @@ export class InvestPortfolioService {
     });
   }
 
-  private async movement(tx: Tx, userId: number, dto: InvestMovementDto, now: Date) {
+  async movement(tx: Tx, userId: number, dto: InvestMovementDto, now: Date) {
     const s = await this.state(tx, userId, now);
     const goal = this.goal(s.goals, dto.goalId);
     const occurredAt = dto.occurredAt ? this.timestamp(dto.occurredAt, now) : now;
@@ -257,7 +259,7 @@ export class InvestPortfolioService {
     return row;
   }
 
-  private async verifyHistory(tx: Tx, userId: number) {
+  async verifyHistory(tx: Tx, userId: number) {
     const [holdings, ledger] = await Promise.all([
       tx.investHolding.findMany({ where: { userId } }),
       tx.investLedger.findMany({ where: { userId }, orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] }),
