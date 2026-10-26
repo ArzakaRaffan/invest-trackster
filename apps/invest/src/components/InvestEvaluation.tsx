@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { InvestReviews } from './InvestReviews';
+import { InvestExplanation } from './InvestExplanation';
 import { api } from '@/lib/api';
 import { currentMonth, type PortfolioState } from '@/lib/types';
 import { assets, states, type Evaluation, type Market, type MarketOrder } from '@/lib/market';
@@ -77,6 +78,7 @@ export function EvaluationView({ id }: { id: string }) {
         {active && <><p className="subtle small">{t('Rencana dicadangkan sampai', 'Plan reserved until')} {new Date(e.reservation!.expiresAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta' })} WIB</p><button className="button" disabled={!state || !!error} onClick={() => setDialog('settle')}>{t('Catat realisasi', 'Record realization')}</button><button className="button secondary" onClick={async () => { try { await api.delete(`/invest/reservations/${e.reservation!.id}`); close(); } catch (err) { setActionError(err instanceof Error ? err.message : 'Error'); } }}>{t('Batalkan reservasi', 'Cancel reservation')}</button></>}
         {e.reservation?.status === 'SETTLED' && <span className="badge">{t('Realisasi sudah tercatat', 'Realization recorded')}</span>}<Link className="button secondary" href="/app/plan">{t('Evaluasi baru', 'New evaluation')}</Link><Link className="text-button" href="/app/portfolio">{t('Buka portofolio', 'Open portfolio')}</Link></div></section>
       <section className="card stack"><details><summary>{t('Alasan penahanan per instrumen', 'Withholding reasons by instrument')}</summary>{e.result.gates.map(g => <div key={g.instrumentId} className="source-record"><strong>{g.name}</strong><ReasonList codes={g.reasons} /></div>)}</details><details><summary>{t('Bukti dan versi sumber saat evaluasi', 'Evidence and source versions at evaluation')}</summary><p className="mono small">{e.ruleset} · {e.input.engine}</p>{e.input.input.instruments.map(i => <div key={i.id} className="source-record"><strong>{i.facts.name} · v{i.version}</strong>{i.facts.sources.map(s => <p key={s.url} className="small"><a href={s.url} target="_blank" rel="noopener noreferrer">{s.title} ↗</a> · {s.observedAt.slice(0,10)}</p>)}</div>)}</details></section>
+      <InvestExplanation id={e.id} stale={e.stale} />
       {e.mode === 'ACTUAL' && <InvestReviews evaluationId={e.id} />}
       {choice && state && <CandidateForm evaluation={e} choice={choice} state={state} done={() => setChoice(null)} />}
       {dialog === 'reserve' && state && <ReserveForm evaluation={e} state={state} done={close} />}{dialog === 'settle' && state && <SettleForm evaluation={e} state={state} done={close} />}
