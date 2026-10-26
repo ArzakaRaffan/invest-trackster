@@ -2,6 +2,39 @@
 
 [PRD](PRD.md) · [Keputusan](00-Decisions.md) · [Metode](04-Methodology.md) · [Menjalankan lokal](../../apps/invest/README.md)
 
+## 2026-10-26 — Detail/perbandingan pasar dan review I4
+
+**Otorisasi:** Arzaka meminta melanjutkan lagi. Branch kerja `feat/invest-market-review`, baseline `b6fe0fa` di repository Invest terpisah. D12, anggaran bulanan20% dan pemisahan PLAN/ACTUAL tetap. Riset primer dan batas penerapan ada di [09-Review-Research.md](09-Review-Research.md).
+
+### Perilaku baru
+
+- Pasar menyediakan pencarian nama/issuer/kanal, filter wilayah/kelas/gate/akses, jumlah hasil dan pagination. Filter dilakukan sebelum paging; akses user lain tidak memengaruhi hasil. Akses berbeda versi atau lebih dari90hari berstatus STALE. Catalog menolak penambahan melebihi1000 record tersimpan, mencegah catatan diterima tetapi tak terlihat.
+- `/app/market/:id` menampilkan identitas, ketentuan, minimum/step/payout, biaya, timestamp harga/kurs, coverage histori, risiko dan sumber. Metadata, quote dan fee unknown tetap unknown. Tidak membuat CAGR/volatilitas/drawdown karangan dari metadata coverage.
+- `/app/market/compare?ids=...` membandingkan2–3 ID unik dalam peer yang sama. Jenis, kelas, exposure, currency dan tenor diperiksa server; mixed peer/ID hilang/duplikat/max3 diuji. Perbandingan fakta tidak membuat ranking tanpa budget/horizon atau menjumlahkan order alternatif.
+- Review pada arsip/detail evaluasi ACTUAL menampilkan perubahan jatah, profil/tujuan/metode, holdings/kas tujuan, source/access eligibility dan pergantian bulan WIB. Pot untuk deviasi hanya holdings tervaluasi+kas tujuan yang tercatat; B yang belum disisihkan tidak masuk denominator. Unknown/basi menahan rasio; target lama tidak dipakai setelah profil/goal/metode berubah. Deviasi≥5 pp dihitung Decimal sebelum display rounding.
+- **Catat peninjauan** menyimpan acknowledgment privat terikat reviewKey. Input/source/gate/bulan berubah membuatnya perlu ditinjau lagi. Acknowledgment tidak memperbaiki data, mengubah uang, membatalkan stale evaluation atau menghidupkan kembali reservasi. Form mempertahankan isian dan mengulang body/key yang sama ketika respons hilang.
+- Review dihitung saat dibaca, UI refresh30detik. Tidak ada cron, notifikasi, AI, atau transaksi broker. Ini bagian review deterministik I4, belum seluruh I4 atau release.
+
+### Penyimpanan dan API
+
+Tidak ada migrasi baru. `InvestChange` menyimpan audit `REVIEW_ACK` dan snapshot per keadaan; `InvestMutation` memakai idempotensi yang sudah ada. Audit tidak dimasukkan ke portfolio revision agar acknowledgment tidak membatalkan cash confirmation atau menghasilkan siklus review sendiri. Serializable dan pemeriksaan state/reviewKey mencegah acknowledgment pada tampilan basi; request concurrent dengan key sama maupun berbeda memakai satu record untuk keadaan yang sama. Perubahan keadaan dapat mempunyai audit baru tanpa menimpa yang lama.
+
+Tambahan API: GET `/invest/instruments/compare?ids=a,b`; filter `assetClass`, `gate`, `access`, `peer`, `search` pada daftar. GET `/invest/reviews` berisi10 review/halaman, `cursor` privat, `evaluationId` opsional. POST `/invest/reviews/:id/acknowledge` memakai reviewKey/confirmed/note/revision/idempotency. Scope user dari JWT; PLAN bukan baseline review aktual. Service/helper baru tidak memanggil provider eksternal dan tidak menulis tabel keuangan Trackster.
+
+### Bukti pemeriksaan
+
+- Backend build cap1536MB, Invest production build/typecheck, frontend Trackster `tsc --noEmit` lulus;5 check Invest lulus, termasuk **25 assertion review** untuk5pp, WIB rollover, unknown/zero, target/version dan pot tanpa kontribusi hipotetis. Audit tenancy0temuan. Windows Node22.12.0; belum image produksi Node24.
+- **266 assertion API** lulus pada Nest/Auth/Invest asli dan PostgreSQL17 loopback kosong dengan48 migrasi yang sudah ada. Termasuk filter/access/compare, private review/cursor, input palsu, concurrent acknowledgment key sama/berbeda, source-change invalidation, replay setelah input berubah, dan golden financial rows/evaluation identik sesudah acknowledge.
+- **46 assertion browser I3/I4** lulus: detail/filter/peer comparison, alokasi/alternatif/reserve/settle, review/acknowledgment, respons sengaja diputus setelah commit, reload, perubahan source, archive, ID/EN dan light/dark. Inspeksi screenshot memperbaiki label/headings, area klik/arah checkbox dan token warna meter. Selector tes menunggu navigation/data dan memakai label select yang sesuai accessible name. Artefak sintetis di `.artifacts/`, diabaikan Git.
+- Sesudah perapian token/area klik, **13 pemeriksaan visual/read-only tambahan** lulus pada build production final: filter/label44px, perbandingan dua kolom desktop, review dan meter390px, light/compact/EN, tanpa runtime error/5xx. Script `apps/invest/scripts/review-visual-check.mjs`; data uang tidak ditulis.
+- Regresi browser I1/I2 dari sesi sebelumnya tidak diklaim diulang; suite API lengkapnya tetap dijalankan. Verifikasi code/schema/rumus tidak membuktikan kalibrasi investasi nyata.
+
+### Batas dan kelanjutan
+
+UI detail/filter/perbandingan I3 dan review deterministik I4 tersedia lokal. Source rights, akses akun/biaya/seri historis produk nyata tetap AC-D4 terbuka. Narasi AI, validator/fallback model nyata, receipt lintas bulan I1, arsip UI versi profil, kalibrasi/pilot serta deployment belum selesai. Katalog awal tetap research-only. Kompatibilitas schema lama terjaga karena tidak ada perubahan schema; kompatibilitas pasangan image produksi belum diuji.
+
+Proses API, frontend dan PostgreSQL scratch milik sesi sudah dihentikan; port3000/3001/4000/55439 tidak mendengarkan. Perubahan hanya source repo Invest dan database sintetis; tidak ada migrasi/deployment produksi.
+
 ## 2026-10-26 — Catalog, engine dan realisasi I3
 
 **Otorisasi:** Arzaka meminta melanjutkan riset dan implementasi setelah source masuk repository Invest. Pekerjaan di checkout `invest-trackster`, branch `feat/invest-market-evaluation`, dari `2fee407`; metode D12 tetap `invest-method-v0.1`. Publikasi source mengikuti permintaan push ke repo Invest sebelumnya, tanpa deployment Trackster/Invest.

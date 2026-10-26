@@ -1,7 +1,7 @@
 # PRD — Invest Trackster v1
 
 > **Status: siap untuk memulai pembangunan lokal.** Metode `invest-method-v0.1` disetujui Arzaka pada **2026-10-13** (D12).
-> **Pembaruan 2026-10-26:** implementasi lokal I0/I1 serta tujuan/profil/portofolio manual I2 sudah tersedia; [status dan bukti](06-Implementation.md). Inti I3 catalog/alokasi/ranking/snapshot serta create/settle reservasi kini tersedia lokal. Sisa detail/filter catalog, review/AI, data nyata/pilot, serta deployment belum selesai. Kesiapan spesifikasi tidak berarti produk lengkap sudah lolos acceptance.
+> **Pembaruan 2026-10-26:** implementasi lokal I0/I1 serta tujuan/profil/portofolio manual I2 sudah tersedia; [status dan bukti](06-Implementation.md). Inti I3 catalog/alokasi/ranking/snapshot serta create/settle reservasi kini tersedia lokal. Detail/filter/perbandingan catalog dan review perubahan pot/acknowledgment kini tersedia. Narasi AI, data nyata/pilot, serta deployment belum selesai. Kesiapan spesifikasi tidak berarti produk lengkap sudah lolos acceptance.
 > **Pemilik produk/keputusan:** Arzaka. Domain/hosting O9 dan gate data/pilot/release tetap diselesaikan sebelum peluncuran terkait.
 
 [Keputusan](00-Decisions.md) · [Metode yang disepakati](04-Methodology.md) · [Bukti penelitian](05-Validation-Results.md) · [Data dan kode](02-Data-and-Integration.md) · [Riset](01-Investment-Research.md)
@@ -45,6 +45,7 @@ Navigasi Invest memakai shell, sidebar desktop, topbar, dan bar bawah lima slot 
 | `/app/plan` | Tujuan aktif, profil T/C/H, batas rugi rupiah, kas bebas, pilihan bulan, simulasi rencana dan evaluasi aktual yang jelas terpisah. | Menampilkan alasan pembatas profil; konflik/input kurang punya CTA spesifik. Simulasi forecast tidak memiliki aksi reservasi/pembelian. |
 | `/app/reviews/:id` | Pembagian kelompok, maximal tiga alternatif per peer, kandidat utama, nominal/biaya/residu, stress dan bukti. Pilih kandidat → preview reservasi → konfirmasi manual. | Hasil partial/withheld tidak dipaksa menjadi shortlist penuh. Sumber atau input berubah menandai hasil perlu diperbarui sebelum reservasi. |
 | `/app/market` | Universe terdaftar, filter kelas/wilayah/akses/gate, jumlah tercakup/belum, tanggal sumber. | Global/crypto riset berlabel; kandidat gagal gate tetap bisa dibaca alasannya tanpa CTA nominal executable. |
+| `/app/market/compare?ids=...` | Perbandingan fakta2–3 ID unik dalam peer yang sama, divalidasi server. | Tidak membuat ranking/order baru; unknown tetap unknown. |
 | `/app/market/:instrumentId` | Identitas, dokumen/biaya/minimum/payout, histori dengan periode, risiko dan akses pengguna, alasan kelayakan. Bandingkan maksimal tiga instrumen sebanding. | Unknown ditampilkan sebagai data kurang; source/asOf melekat pada setiap angka penting. |
 | `/app/menu` | Review/riwayat, sumber/catalog, pengaturan tema/bahasa/density, tautan kembali Trackster, keluar. | Tema/lang/density mengikuti perilaku v3; penyimpanan preferensi per origin tidak diasumsikan tersinkron lintas website. |
 | `/app/reviews` | Snapshot per bulan, perubahan jatah/profil/holdings, deviasi ≥5 pp, alasan review; tandai sudah ditinjau atau refresh hasil. | Meninjau bukan membeli. Perubahan metode/source tidak mengubah arsip hasil lama. |
@@ -154,6 +155,7 @@ Money memakai Decimal dengan kapasitas agregat bulan yang cukup, minimal 18,2 un
 | `GET /invest/payment-events?month=...`, `PATCH /invest/payment-events/:id` | Read/reconcile receipt links, complete/cancel/reschedule dengan alasan/version; bukan CRUD Income kedua. |
 | `GET/POST /invest/holdings`, `PATCH /invest/holdings/:id` | Baca/opening holding/valuasi atau adjustment terjelaskan; pembelian lewat ledger. |
 | `GET/POST /invest/ledger`, `POST /invest/ledger/:id/correction` | Movement+reference/idempotency/version; balas holdings/quota revision. Correction menyimpan reversal/replacement. |
+| `GET /invest/instruments/compare?ids=a,b` | Dua sampai tiga ID unik dengan peer yang sama; fakta/access privat dari satu snapshot baca. |
 | `GET /invest/instruments`, `GET /invest/instruments/:id` | Filter/pagination peer/region/gate; detail source/rights/data quality, akses user privat. |
 | `POST /invest/catalog/instruments`, `PATCH /invest/catalog/instruments/:id`, `POST /invest/catalog/instruments/:id/observations` | Write instrument/observation manual dengan source refs, rights dan review; khusus pengguna catalog berwenang, schema allowlist. |
 | `POST /invest/evaluations`, `GET /invest/evaluations/:id` | month, goalId, mode PLAN/ACTUAL, inputRevision; balas snapshot/result/status. PLAN tidak mengizinkan reserve/settle. |

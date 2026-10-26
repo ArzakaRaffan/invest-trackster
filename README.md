@@ -2,7 +2,7 @@
 
 Website investasi dengan akun, backend, dan sistem desain v3 Trackster bersama. Invest memakai jatah **20% bulanan** dari rencana 50/30/20: jatah aktual dari pemasukan yang sudah diterima dan rencana jatah dari forecast ditampilkan terpisah.
 
-**Status 26 Oktober 2026:** fondasi, anggaran bulanan, tujuan/profil risiko, dan portofolio manual tersedia untuk dijalankan lokal. Inti I3 kini menambahkan katalog bersumber, alokasi/stress/ranking deterministik, pilihan alternatif, arsip evaluasi, dan reserve→settle manual. Katalog nyata awal masih riset; AI, kalibrasi/pilot dan release belum selesai. Status serta bukti pengujian ada di [catatan implementasi](docs/invest/06-Implementation.md); ini belum merupakan rilis produksi lengkap.
+**Status 26 Oktober 2026:** fondasi, anggaran bulanan, tujuan/profil risiko, dan portofolio manual tersedia untuk dijalankan lokal. I3 menyediakan katalog/detail/filter/perbandingan bersumber, alokasi/stress/ranking, pilihan alternatif, arsip evaluasi dan reserve→settle manual. Review I4 menampilkan perubahan serta deviasi pot dan mencatat peninjauan tanpa transaksi. Katalog nyata awal masih riset; AI, kalibrasi/pilot dan release belum selesai. Status serta bukti pengujian ada di [catatan implementasi](docs/invest/06-Implementation.md); ini belum merupakan rilis produksi lengkap.
 
 ## Isi repository
 
@@ -35,6 +35,6 @@ Petunjuk akun, fixture sintetis, pengujian API/browser, dan perilaku fitur terse
 - Invest: `npm run typecheck` dan `npm run build` dari `apps/invest`.
 - Tes API memakai database kosong sintetis; instruksi dan batas pengujiannya ada di [catatan implementasi](docs/invest/06-Implementation.md).
 
-Mulai pengembangan berikutnya dari [PRD](docs/invest/PRD.md), [keputusan pengguna](docs/invest/00-Decisions.md), dan [metode yang disetujui](docs/invest/04-Methodology.md). Tahap berikutnya adalah melengkapi data produk/kanal nyata serta detail/filter catalog, review/perubahan pot dan AI I4, lalu kalibrasi/pilot. Tiga catatan sumber awal dan batasnya ada pada [riset catalog](docs/invest/08-Catalog-Research.md).
+Mulai pengembangan berikutnya dari [PRD](docs/invest/PRD.md), [keputusan pengguna](docs/invest/00-Decisions.md), dan [metode yang disetujui](docs/invest/04-Methodology.md). Tahap berikutnya adalah melengkapi data produk/kanal nyata, narasi AI tervalidasi I4, serta kalibrasi/pilot. Riset dan kontrak review ada di [catatan review](docs/invest/09-Review-Research.md). Tiga catatan sumber awal dan batasnya ada pada [riset catalog](docs/invest/08-Catalog-Research.md).
 
 Workflow deployment warisan dibatasi ke repository `ArzakaRaffan/trackster`; job build/publish image dan deploy tidak berjalan dari repo Invest ini. Compose, Nginx, dan domain Trackster yang disertakan masih konfigurasi produk asal. Deployment Invest memerlukan konfigurasi tersendiri.

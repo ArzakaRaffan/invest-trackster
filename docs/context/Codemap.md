@@ -4,6 +4,9 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 
 ## Invest — tambahan lokal 2026-10-26
 
+- Kelanjutan I3/I4: `invest-review.ts` menghitung diff, drift Decimal5pp, rollover WIB dan reviewKey; `invest-market.service.ts/controller.ts` menambah compare/filter/reviews/ack. Acknowledgment memakai audit `InvestChange`, tidak masuk portfolio revision. Tidak ada migrasi baru.
+- UI: `InstrumentDetails.tsx`, `/app/market/[id]`, `/app/market/compare` dan `InvestReviews.tsx` pada arsip/detail evaluasi. QA tambahan `invest-review.check.ts`, `scripts/invest-review-e2e.mjs`, alur detail/filter/compare/ack pada `market-browser-check.mjs`. Baca `docs/invest/09-Review-Research.md`.
+
 - I3: `invest-engine.ts` (gate, M3–M6, peer/top3, lot/biaya dan full-pot stress), `invest-catalog.ts` (tiga catatan nyata research-only), `invest-market.service.ts/controller.ts/dto.ts` (versi metadata, akses privat, mapping, snapshot, pilihan kandidat dan reserve→settle). `invest-payload.guard.ts` memvalidasi raw DTO sebelum global pipe lama menghapus unknown fields.
 - Migrasi `20261026140000_invest_market_evaluation`: catalog bersama `InvestInstrument`; actor audit `InvestCatalogRevision`, akses `InvestInstrumentAccess` dan arsip `InvestEvaluation` berscope user. Tambahan mapping holding + plan/settledLedgerIds reservasi, tanpa perubahan tabel keuangan lama.
 - UI I3: `InvestMarket.tsx`, `InvestEvaluation.tsx`, `lib/market.ts`; Pasar/Sumber, panel Rencana, `/app/reviews` dan `/app/reviews/[id]`. UI sumber memakai metadata manual; tidak ada harga sintetis produksi. QA: `invest-engine.check.ts`, `scripts/invest-market-e2e.mjs`, `apps/invest/scripts/market-browser-check.mjs`.
