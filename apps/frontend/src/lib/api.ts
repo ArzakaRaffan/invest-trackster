@@ -1,0 +1,99 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Endpoint auth sendiri dikecualikan supaya gagal login/logout tidak memicu redirect loop.
+const isAuthPath = (path: string) => path.startsWith('/auth/');
+
+// Sesi kedaluwarsa: ±30 request paralel layar app semuanya 401 → cukup SATU logout + redirect (dulu tiap 401 memanggil
+// logout sendiri = puluhan request sia-sia + redirect berulang).
+let sessionEnding = false;
+function endSession() {
+  if (sessionEnding) return;
+  sessionEnding = true;
+  fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
+    window.location.href = '/login';
+  });
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    credentials: 'include', // wajib supaya cookie httpOnly ikut terkirim
+    // GET tanpa header khusus = "simple request" lintas origin (trackster.dev → api.trackster.dev) → tanpa preflight
+    // OPTIONS (dulu ±35 ekstra tiap buka app). Request yang mengubah data tetap JSON (lapisan CSRF, lihat audit keamanan).
+    headers: {
+      ...(options.method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+      ...options.headers,
+    },
+  });
+
+  if (res.status === 401 && typeof window !== 'undefined' && !isAuthPath(path)) {
+    // Sesi kadaluarsa/tidak valid: bersihkan cookie di server lalu balik ke login
+    // otomatis, biar tidak nyangkut di halaman yang gagal fetch selamanya.
+    endSession();
+    throw new ApiError('Sesi berakhir, mengarahkan ke login...', 401);
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message || `Request gagal (${res.status})`, res.status);
+  }
+
+  return res.json();
+}
+
+/** POST yang membalas SSE (`data: {json}\n\n`) — tiap event dikirim ke `onEvent`. Resolve saat stream habis. */
+async function postStream(path: string, body: unknown, onEvent: (event: any) => void): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    endSession();
+    throw new ApiError('Sesi berakhir, mengarahkan ke login...', 401);
+  }
+  if (!res.ok || !res.body) throw new ApiError(`Request gagal (${res.status})`, res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) >= 0) {
+      const chunk = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (!chunk.startsWith('data:')) continue; // ping komentar
+      try {
+        onEvent(JSON.parse(chunk.slice(5)));
+      } catch {
+        // event rusak — lewati
+      }
+    }
+  }
+}
+
+export const api = {
+  postStream,
+  get: <T>(path: string) => request<T>(path, { method: 'GET' }),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+};
+
+export { API_URL, ApiError };

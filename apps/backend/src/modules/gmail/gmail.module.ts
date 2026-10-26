@@ -1,0 +1,50 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { GmailController } from './gmail.controller';
+import { GmailAuthService } from './gmail-auth.service';
+import { GmailSyncService } from './gmail-sync.service';
+import { EmailPipelineService } from './email-pipeline.service';
+import { ParserRegistryService } from './parsers/parser-registry.service';
+import { BcaParser } from './parsers/bca.parser';
+import { JagoParser } from './parsers/jago.parser';
+import { FlipParser } from './parsers/flip.parser';
+import { BniParser } from './parsers/bni.parser';
+import { MandiriParser } from './parsers/mandiri.parser';
+import { RayaParser } from './parsers/raya.parser';
+import { BriParser } from './parsers/bri.parser';
+import { AuthModule } from '../auth/auth.module';
+import { TransactionModule } from '../transaction/transaction.module';
+import { BudgetModule } from '../budget/budget.module';
+import { TelegramModule } from '../telegram/telegram.module';
+import { AiModule } from '../ai/ai.module';
+import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
+import { IncomeModule } from '../income/income.module';
+import { BalanceModule } from '../balance/balance.module';
+
+@Module({
+  imports: [
+    AuthModule,
+    TransactionModule,
+    BudgetModule,
+    TelegramModule,
+    MerchantAliasModule,
+    IncomeModule,
+    BalanceModule,
+    forwardRef(() => AiModule),
+  ],
+  controllers: [GmailController],
+  providers: [
+    GmailAuthService,
+    GmailSyncService,
+    EmailPipelineService,
+    ParserRegistryService,
+    BcaParser,
+    JagoParser,
+    FlipParser,
+    BniParser,
+    MandiriParser,
+    RayaParser,
+    BriParser,
+  ],
+  exports: [GmailSyncService, GmailAuthService, EmailPipelineService, ParserRegistryService],
+})
+export class GmailModule {}

@@ -1,0 +1,12 @@
+import { Module } from '@nestjs/common';
+import { MerchantAliasController } from './merchant-alias.controller';
+import { MerchantAliasService } from './merchant-alias.service';
+import { AuthModule } from '../auth/auth.module';
+
+@Module({
+  imports: [AuthModule],
+  controllers: [MerchantAliasController],
+  providers: [MerchantAliasService],
+  exports: [MerchantAliasService],
+})
+export class MerchantAliasModule {}

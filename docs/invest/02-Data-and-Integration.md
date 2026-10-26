@@ -1,0 +1,105 @@
+# 02 — Data Pasar dan Integrasi Trackster
+
+[Panduan utama](README.md) · [Keputusan](00-Decisions.md) · [Riset investasi](01-Investment-Research.md) · [Produk dan validasi](03-Product-and-Validation.md)
+
+**Pemeriksaan riset: 2026-10-13.** Provider produksi belum dipilih; kontrak pelaksanaan ada pada [PRD](PRD.md). Endpoint anggaran/reconciliation I0/I1 mulai diimplementasi 2026-10-26 ([bukti terkini](06-Implementation.md)); keterangan kode/ASUMSI di bawah adalah snapshot penelitian awal. Dokumen ini memisahkan dokumentasi sumber (`LITERATUR`), pemeriksaan source lokal (`KODE`), hasil request publik (`API`), dan rancangan saat penelitian (`ASUMSI`).
+
+## A. Kandidat sumber pasar
+
+Tanggal pemeriksaan seluruh baris S1–S8 adalah **2026-10-13**. Cakupan berikut adalah kandidat, bukan jaminan universe lengkap. Tidak ada pendaftaran akun atau pembelian paket data pada sesi ini.
+
+| ID / jenis | Sumber dan cakupan kandidat | Hasil pemeriksaan / batas akses | Lisensi, kualitas, dan implikasi produk |
+| --- | --- | --- | --- |
+| S1 · LITERATUR + API | [Layanan data BEI](https://www.idx.co.id/id/produk/layanan-data-bei/), [ketentuan umum versi 0.3/2024](https://www.idx.id/media/vaupc3md/20240215_final-general-term-of-use-version-0-3-2024-efektif-1-january-2024-2.pdf). Instrumen dan data bursa Indonesia. | Halaman layanan 403 melalui browser tool dan shell; PDF ketentuan dapat dibaca. Belum ada feed IDX yang diuji. | Dokumen membedakan hak display/non-display dan redistributor. Akses halaman publik bukan lisensi feed. Perlu konfirmasi paket, simpan, analisis, dan tampil sebelum integrasi saham/ETF Indonesia. |
+| S2 · LITERATUR | [BI: JISDOR](https://www.bi.go.id/id/statistik/informasi-kurs/jisdor/default.aspx), [target inflasi](https://www.bi.go.id/id/statistik/indikator/target-inflasi.aspx). Kurs referensi dan konteks makro. | Halaman dapat dibaca melalui browser tool; otomasi API dan histori belum diuji. | JISDOR adalah referensi, bukan harga FX broker. Hak reuse/otomasi belum dipastikan; input manual bersumber dapat diteliti. Memengaruhi konversi nilai IDR dan skenario. |
+| S3 · LITERATUR | [BPS: metadata IHK](https://sirusa.web.bps.go.id/metadata/indikator/d568de59-cd83-b851-e5f8-e6f5c047f31f), [tabel inflasi bulanan](https://www.bps.go.id/id/statistics-table/2/MSMy/inflasi-umum-). Inflasi Indonesia. | Metadata/tabel ditemukan melalui pencarian; endpoint Web API belum diuji. | Perlu memastikan seri, wilayah, tahun dasar, unit MoM/YoY dan hak reuse. Memengaruhi skenario daya beli; bukan price feed instrumen. |
+| S4 · LITERATUR | [DJPPR: pengumuman ORI026 historis](https://djppr.kemenkeu.go.id/rencanapenjualanobligasinegararitelseriori026t3danori026t6), serta memorandum/prospektus penerbit untuk seri pilihan. | Pengumuman terindeks; isi halaman langsung kosong di browser tool. Belum ada API produk SBN, harga sekunder, atau seri aktif yang diuji. | Data manual harus menyertakan seri, tanggal, masa penawaran, kupon, minimum, dan likuiditas. Fakta seri lama tidak dijadikan ketentuan seri baru. |
+| S5 · LITERATUR + API | Alpha Vantage: [dokumentasi API](https://www.alphavantage.co/documentation/), [support/kuota](https://www.alphavantage.co/support/), [terms](https://www.alphavantage.co/terms_of_service/). Kandidat saham/ETF global dan makro. | Demo daily IBM mengembalikan data. Support menyebut 25 request/hari untuk layanan gratis; pengecualian terverifikasi tidak diasumsikan berlaku pada Trackster. Endpoint adjusted/premium harus dicek satu per satu. | Terms membatasi penggunaan personal non-komersial kecuali ada kesepakatan tertulis; penggunaan untuk pihak lain perlu pemeriksaan cakupan. Tidak membuktikan cakupan IDX, global lengkap, atau redistribusi gratis. |
+| S6 · LITERATUR + API | CoinGecko: [simple price](https://docs.coingecko.com/reference/simple-price), [histori Demo](https://docs.coingecko.com/demo/reference/coins-id-market-chart), [API terms](https://www.coingecko.com/en/api_terms). Harga/identitas crypto. | Probe harga publik BTC/ETH berhasil tanpa key. Dokumentasi Demo memerlukan key dan membatasi histori ke 365 hari; hasil publik satu kali tidak meniadakan kebutuhan key resmi. | Periksa paket, kuota akun, atribusi, hak simpan/tampil. Dokumentasi Pro bukan entitlement Demo. Histori gratis yang pendek membatasi evaluasi jangka panjang. |
+| S7 · API | Yahoo chart endpoint yang dicoba pada P-API-03 di bawah. Kandidat eksplorasi indeks Indonesia. | Satu request `^JKSE` berhasil. Kontrak API resmi/berlisensi untuk penggunaan ini belum ditemukan pada sesi ini. | Status kandidat eksplorasi saja. Tidak dijadikan ketergantungan produksi sebelum hak akses, kontrak, dan kualitas dipastikan. Tidak mengekstrapolasi satu indeks ke seluruh instrumen. |
+| S8 · ASUMSI | Input manual dari dokumen resmi bank, manajer investasi, penerbit, atau penyedia pembelian yang dipilih pengguna. | Diizinkan oleh D6; belum ada produk atau dokumen provider tertentu yang diperiksa. | Simpan sumber per nilai dan tanggal observasi. Input manual tidak otomatis mempunyai hak distribusi atau kualitas tinggi; perlu review dan rekonsiliasi. Jalur kandidat reksa dana, minimum, biaya, dan instrumen tanpa feed. |
+
+S1, S5, dan S6 mempunyai sumber ketentuan yang ditinjau secara terbatas, bukan audit lisensi menyeluruh. Keputusan penggunaan tetap O7 dan harus sesuai akses v1 serta rencana perluasan user. Berhasil menerima respons tidak sama dengan mendapat izin menampilkan data ke pengguna lain.
+
+## B. Log percobaan akses publik
+
+**Jenis: API. Lingkungan:** shell PowerShell lokal, HTTP GET lewat `Invoke-WebRequest -UseBasicParsing -TimeoutSec 15`, satu request per URL, tanpa cookie sesi Trackster atau kredensial pengguna. Nilai `demo` Alpha Vantage adalah parameter contoh publik vendor. Pengujian ini hanya memeriksa HTTP, bentuk JSON, serta metadata ringan; respons harga tidak disimpan di repo.
+
+| ID | Waktu pemeriksaan WIB / request | Hasil yang benar-benar diamati | Keterbatasan / dampak produk |
+| --- | --- | --- | --- |
+| P-API-01 | 2026-10-13 15:30:21; [CoinGecko simple price](https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=idr,usd&include_last_updated_at=true) | HTTP 200; top-level `bitcoin`, `ethereum`; bitcoin memiliki `idr`, `usd`, `last_updated_at`. | Timestamp tersedia tetapi umur/nilai serta kualitas harga belum diaudit. Belum menguji histori, token mapping, cakupan besar, pagination, kuota, retry, atau SLA. Mendukung percobaan adapter harga crypto saja. |
+| P-API-02 | 2026-10-13 15:30:22; [Alpha Vantage daily IBM demo](https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=IBM&apikey=demo) | HTTP 200; `Meta Data`, `Time Series (Daily)`; 100 tanggal; tanggal pertama dalam respons `2026-10-12`. | Satu simbol demo, tidak membuktikan akses akun gratis untuk simbol lain. Belum audit missing values, urutan, corporate actions, adjusted series, dan distribusi. Membuktikan bentuk contoh data global dapat diakses. |
+| P-API-03 | 2026-10-13 15:30:22; [Yahoo chart indeks JKSE](https://query1.finance.yahoo.com/v8/finance/chart/%5EJKSE?range=1mo&interval=1d) | HTTP 200; properti `chart`; satu `result`, `error=null`. | Isi seri, kalender, harga, timestamp, lisensi, dan kontrak belum diaudit. Tidak menguji saham Indonesia per emiten. Memengaruhi daftar kandidat eksplorasi, bukan pemilihan provider. |
+| P-API-04 | 2026-10-13 15:30:22; [halaman layanan data BEI](https://www.idx.co.id/id/produk/layanan-data-bei/) | Request halaman HTML gagal HTTP 403. | Bukan pengujian feed/API IDX dan bukan bukti bahwa data IDX tidak tersedia melalui lisensi. Tidak mencoba menghindari pembatasan. Memerlukan jalur data resmi/manual yang dapat dipakai. |
+
+Percobaan dokumentasi tambahan: URL CoinGecko lama `/reference/common-errors-rate-limit` mengembalikan 404. URL histori `/v3.0.1/reference/coins-id-market-chart` mengarah ke dokumentasi Demo yang dicantumkan pada S6. Link dokumentasi harus diperiksa ulang saat memilih adapter.
+
+Replikasi: ulangi GET publik yang sama, rekam waktu, status, tipe isi, nama field, jumlah titik, rentang tanggal, dan error vendor; jangan menganggap HTTP 200 sukses jika body hanya pesan kuota. Jangan memakai output demo sebagai data finansial pengguna atau dasar ranking teruji.
+
+## C. Fakta kode Trackster yang relevan
+
+**Jenis: KODE. Tanggal: 2026-10-13. Konteks:** working tree branch `feat/multi-user-launch`, HEAD `3694740`, dengan perubahan lokal yang sudah ada. Audit source terbatas; tidak membaca database, `.env`, akun broker, atau produksi. Tidak ada klaim hasil runtime/integration test.
+
+| ID | Fakta dan sumber kode | Keterbatasan / implikasi bagi Invest |
+| --- | --- | --- |
+| K1 | `calcWeeklyAllocation(totalIncome)` membulatkan 50% needs dan 30% wants; `savings = totalIncome - needs - wants`. [budget-allocation.service.ts](../../apps/backend/src/modules/budget-allocation/budget-allocation.service.ts). | `savings` menjaga total tepat, sehingga pada nominal kecil bisa berbeda dari pembulatan 20% independen. Pemakaian hasil ini pada Invest perlu O1–O2; jangan mengubah fungsi lama dalam pekerjaan dokumentasi. |
+| K2 | `GET /budget-allocation/preview` read-only, mengembalikan `weekStart`, `totalIncome`, `leftover`, `isOverspent`, `savingsRecommendation`, dan `allocation.{needs,wants,savings}`. [controller](../../apps/backend/src/modules/budget-allocation/budget-allocation.controller.ts), [computePreview](../../apps/backend/src/modules/budget-allocation/budget-allocation.service.ts). | Query income memakai `periodStart=weekStart`, stream non-IRREGULAR, tanpa filter status eksplisit. `savingsRecommendation = savings + leftover`; angka ini bukan jatah 20% murni. Tidak boleh menyebut query ini pasti menjumlahkan semua income aktual CONFIRMED. |
+| K3 | `GET /income/allocation` mengambil forecast expected mingguan, mengurangi total DailyBudget, lalu membagi leftover 50% save, 30% invest, 20% spend. [income.controller.ts](../../apps/backend/src/modules/income/income.controller.ts), [getAllocationRecommendation](../../apps/backend/src/modules/income/income.service.ts). | Rasio 50/30/20 di sini memiliki makna berbeda dari D2. `allocation.invest` bukan sumber jatah Invest 20%. |
+| K4 | Forecast menyediakan `conservative`, `expected`, `max`, `received`, serta `upsideMonthly`; rute `/income/forecast/week?date=` dan `/income/forecast/horizon?weeks=`. [service](../../apps/backend/src/modules/income-forecast/income-forecast.service.ts), [controller](../../apps/backend/src/modules/income-forecast/income-forecast.controller.ts). | IRREGULAR tidak masuk forecast dasar. `received` memakai streamId dan CONFIRMED serta periodStart/fallback receivedAt pada stream yang sama; bukan agregat semua pemasukan akun. Fallback forecast dari konfigurasi bukan bukti kas tersedia. |
+| K5 | `GET /income` menerima startDate/endDate/status dan memfilter userId; model Income memiliki receivedAt, periodStart, streamId dan status CONFIRMED/PENDING/INTERNAL. [service](../../apps/backend/src/modules/income/income.service.ts), [schema](../../apps/backend/prisma/schema.prisma). | Tanggal penerimaan berbeda dari periode pendapatan. Rute tanpa parameter status tidak otomatis mengeluarkan PENDING/INTERNAL. Basis aktual Invest perlu aturan eksplisit O2. |
+| K6 | Auth memakai cookie `trackster_jwt`, httpOnly, secure di production, SameSite lax, domain dari konfigurasi; guard memvalidasi JWT, status ACTIVE dan tokenVersion. [auth.controller.ts](../../apps/backend/src/modules/auth/auth.controller.ts), [jwt-auth.guard.ts](../../apps/backend/src/common/guards/jwt-auth.guard.ts), [CurrentUser](../../apps/backend/src/common/decorators/current-user.decorator.ts). | Sharing akun/backend dapat memakai pola ini, tetapi domain baru, kedaluwarsa/revoke dan otorisasi v1 tetap perlu tes. userId tidak berasal dari body/query klien. |
+| K7 | CORS saat ini satu origin dari FRONTEND_URL atau localhost, dengan credentials. Klien menggunakan credentials include. [main.ts](../../apps/backend/src/main.ts), [api.ts](../../apps/frontend/src/lib/api.ts). | Website terpisah pada origin baru memerlukan konfigurasi origin yang cocok; berbagi cookie saja tidak cukup. Tidak ada perubahan CORS/domain pada sesi ini. |
+| K8 | Pembantu waktu memakai WIB; weekly allocation berawal Senin. [wib.ts](../../apps/backend/src/common/wib.ts), [budget-allocation.service.ts](../../apps/backend/src/modules/budget-allocation/budget-allocation.service.ts). | Kandidat batas periode harus selaras dengan Trackster. Mapping minggu/bulan tetap O1, jangan mengalikan satu minggu dengan empat untuk mewakili semua bulan. |
+| K9 | Schema memiliki kategori INVESTASI, tetapi audit schema dan AppModule tidak menemukan model/modul khusus Invest, holdings, atau market data. [schema](../../apps/backend/prisma/schema.prisma), [app.module.ts](../../apps/backend/src/app.module.ts). | Kategori pengeluaran tidak cukup untuk menghitung unit, harga pokok, atau kontribusi per jatah. Penyimpanan Invest masih rancangan. |
+| K10 | Ada guard rate limit AI per user/rute berbasis memori proses. [ai-rate-limit.guard.ts](../../apps/backend/src/common/guards/ai-rate-limit.guard.ts). | Rute AI Invest nantinya perlu mengikuti pola guard; kuota tidak persisten dan bukan validasi konsistensi isi AI. |
+
+Dokumen [Architecture](../context/Architecture.md) dan [CLAUDE.md](../../CLAUDE.md) memuat bagian single-user yang tertinggal dari kode. Folder [multi-user](../multi-user/README.md) memberi konteks migrasi; status produksi harus diverifikasi tersendiri sebelum implementasi. Perbedaan ini dicatat tanpa mengubah dokumentasi migrasi atau perubahan lokal pengguna.
+
+## D. Kontrak data kandidat — ASUMSI, belum diimplementasi
+
+Tanggal rancangan: 2026-10-13. Dasar: D1–D11, K1–K10, S1–S8. Periode utama bulanan (D10) serta pemisahan rencana jatah dan jatah aktual (D11) sudah disepakati; rincian metode M1–M7 disetujui pada D12; pilihan deployment dan gate data/pilot tetap terpisah. Nama di bawah adalah konsep data, bukan nama tabel atau endpoint yang disetujui.
+
+| Konsep | Informasi minimum yang diusulkan | Dampak / ketergantungan |
+| --- | --- | --- |
+| Jatah bulanan | User, identitas bulan, awal/akhir bulan dan zona; forecast bulanan beserta skenarionya dan rencana jatah 20%; pemasukan diterima bulan itu dan jatah aktual 20%; versi aturan, income sumber dengan cadence/tanggal/periode, koreksi/pemakaian. | Dua angka terpisah sesuai D10–D11; tidak dijumlahkan. Audit atribusi dan rekonsiliasi O1/O2/O8. Simpan sumber basis sebelum menampilkan nominal. |
+| Identitas instrumen | ID internal, jenis, issuer, simbol+bursa/mata uang; crypto memakai ID provider dan chain/contract jika diperlukan; kanal pembelian. | Simbol sama dapat berbeda instrumen. Indeks, fund, dan produk turunan tidak digabung hanya karena nama mirip. |
+| Observasi pasar | Nilai/unit/mata uang, asOf pasar, fetchedAt, sumber/URL, frekuensi, metode raw/adjusted/total return, hak pakai dan kualitas. | Snapshot dapat direproduksi; waktu mengambil data bukan waktu pasar. |
+| Input manual pasar | Nilai, sumber dokumen, halaman/bagian, tanggal berlaku, tanggal input, status review; jangan unggah dokumen privat ke repo. | Angka biaya, NAB, minimum, dan kupon dapat dilacak; perlu O7/V3/V4. |
+| Portofolio manual | User, instrumen, unit atau nilai snapshot yang jelas jenisnya, tanggal, mata uang, biaya dasar jika diketahui, kontribusi/penarikan/distribusi. | Nilai snapshot saja tidak cukup untuk return historis; jangan mengarang harga pokok. |
+| Hasil evaluasi | Profil/tujuan dan versinya, jatah/portfolio snapshot, universe/coverage, versi aturan, nominal, skor per fitur, alasan, sumber, kekurangan data, narasi AI terpisah. | Hasil dapat dibandingkan antarperiode; input yang sama harus memberi perhitungan sama. |
+
+Usulan alur: website Invest → auth/API Trackster → pembacaan jatah dan portofolio per user → filter kelayakan → perhitungan aturan → hasil beserta bukti → penjelasan AI. Adapter sumber pasar dapat memperbarui cache bersama sesuai lisensi. Ini rancangan alur, belum ada modul baru.
+
+Rincian kontrak sekarang mengikuti [PRD](PRD.md) dan [M1–M7 v0.1 yang disetujui](04-Methodology.md), dengan [hasil penelitian](05-Validation-Results.md). Perubahan metode tidak mengubah fakta source K1–K10 atau mengklaim endpoint baru telah tersedia.
+
+Integrasi awal diusulkan membaca data finansial Trackster. Input portofolio bukan bukti kas bergerak: jangan mendebit BankBalance atau menambah Income otomatis dari perubahan nilai holdings. Pembelian yang sudah tercatat Trackster perlu referensi rekonsiliasi agar tidak dicatat dua kali; aturan hubungannya tetap O8. Saldo bank mengikuti aturan live incremental proyek.
+
+## E. Pembaruan, cakupan, dan data kurang
+
+**ASUMSI kebijakan yang perlu disetujui pada O5/O7.** Jadwal harga, indikator makro, dan evaluasi rekomendasi perlu dipisahkan. Makro diperbarui menurut rilis; harga mengikuti kalender pasar sumber; biaya/minimum mengikuti dokumen terbaru. Tidak ada SLA atau batas jam/hari yang ditetapkan sekarang.
+
+Saat provider gagal, simpan snapshot valid terakhir hanya bila hak pakai mengizinkan, tampilkan asOf dan status keterlambatan, serta hentikan ranking yang membutuhkan data kritis. Nilai hilang tidak menjadi nol; histori pendek tidak diisi AI. Perbandingan data berbeda mata uang/frekuensi perlu normalisasi terdokumentasi. UI menampilkan pasar yang sudah tercakup dan yang belum, sehingga pemindaian parsial tidak tampak menyeluruh.
+
+Sebelum memilih sumber, ukur universe yang tersedia terhadap universe target, kelengkapan histori, pembaruan, kalender, corporate actions, biaya request, retry/backoff, dan fallback manual. Tes integrasi perlu meliputi scoping user, login lintas origin, pencabutan sesi, serta request gagal/kuota. Semua ini pekerjaan berikutnya, bukan hasil tes sesi dokumentasi.
+
+## F. Bahan integrasi setelah riset metode
+
+**ASUMSI kontrak pelaksanaan, 2026-10-13.** Dasar M1–M7 serta pemeriksaan ulang service forecast dan DTO stream lokal; endpoint Invest belum diimplementasi. Catalog manual dan histori eksploratif tetap mempunyai batas hak/kualitas yang disebutkan di atas.
+
+Kode forecast yang diperiksa mendukung `payDayOfWeek` dan `payDayOfMonth` pada konfigurasi stream, tetapi controller masih menyediakan forecast week/horizon. Untuk metode bulanan, backend perlu membentuk event pembayaran bertanggal dan hubungan receipt; menjumlahkan semua minggu lintas bulan atau mengambil horizon ×4 tidak menyelesaikan mapping itu. Formula forecast per kind dapat dipakai ulang tanpa mengubah semantik endpoint lama.
+
+Kontrak API yang perlu dirinci dalam PRD:
+
+| Operasi kandidat | Input dan output minimum | Gate kompatibilitas |
+| --- | --- | --- |
+| Ringkasan bulan | Month `YYYY-MM`; output zona/batas/asOf, actual A, forecast F+scenario, dua jatah, sumber, status kelengkapan, penggunaan/reservasi dan kas bebas yang dikonfirmasi. Decimal di API sebagai string; snapshot memiliki versi. | Semua query scoped user dari sesi; pending/internal tidak masuk aktual; event/receipt tidak dobel. |
+| Profil/tujuan | Jawaban T, input capacity/absolute loss, tanggal tujuan, kebutuhan pencairan, pemahaman; output status/kategori/caps/alasan/versi. | Unknown/conflict ditahan; jawaban privat dan tidak masuk cache bersama. |
+| Holdings/ledger manual | Instrumen, goal, unit/nilai/tanggal/mata uang, cost basis opsional, movement/ref/bulan, idempotency ID. | Harga pokok unknown bukan nol; perubahan valuasi bukan gerak bank; pembelian dengan referensi receipt tidak dobel. |
+| Evaluasi/shortlist | Snapshot bulan/profil/goal/holdings dan ruleset; output universe+coverage, gate, fitur/skor, nominal indikatif/residu, sumber dan keadaan withheld. | Hak pakai+asOf, peer group, minimum/fees dan full-pot stress; tidak memakai forecast sebagai cash executable. |
+| Penjelasan AI | ID hasil evaluasi dan sumber yang diizinkan; output narasi beserta source IDs. | Guard JWT lalu AI quota; validator dan fallback; nominal/ranking dirender dari engine. |
+
+V1 dapat memakai catalog tersupervisi dengan dokumen resmi yang diinput manual; tidak harus menunggu otomatisasi feed seluruh pasar. Instrumen dengan biaya/akses/data belum lengkap tetap daftar riset. Provider gratis dengan histori yang tidak memenuhi gate tidak dipaksakan menjadi sumber statistik jangka panjang.
+
+Pilihan deployment masih O9. Kandidat untuk ditinjau adalah website pada subdomain milik Trackster dengan akun/backend yang sama; nama `invest.trackster.dev` belum disetujui atau dikonfigurasi. PRD perlu menguraikan origin CORS eksplisit, domain cookie, logout/revoke, akses v1, reuse komponen/desain v3 dan isolasi cache. Tidak ada DNS, cookie, CORS, database atau frontend yang diubah oleh pekerjaan riset ini.
+
+Hasil eksplorasi baru: tiga seri adjusted close publik BIL/IEF/VT memiliki 85 bulan data pada pemeriksaan 2026-10-13 dan dipakai untuk 84 return bulanan 2019–2025. Audit/URL/hash serta batasnya ada di [05-Validation-Results.md](05-Validation-Results.md) dan [JSON penelitian](research/results-v0.1.json); hasil ini tidak memilih Yahoo sebagai provider produksi.

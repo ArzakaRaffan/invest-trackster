@@ -1,0 +1,284 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BillingCycle, Prisma, Source } from '@prisma/client';
+import { PrismaService } from '../../prisma.service';
+import { GmailAuthService } from '../gmail/gmail-auth.service';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
+import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
+import { spend } from '../../common/spend';
+import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { detectRecurring } from './recurring-detect';
+import { rollDueDate } from './subscription-due';
+import { buildSubscriptionsIcs, calendarFile, parseCalendarFile, verifyCalendarSig } from './subscription-ics';
+
+type SubRow = {
+  id: number;
+  name: string;
+  amount: unknown;
+  cycle: BillingCycle;
+  nextDueDate: Date;
+  source: Source | null;
+  notes: string | null;
+  reminderDaysBefore: number;
+  isActive: boolean;
+  googleCalendarEventId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+@Injectable()
+export class SubscriptionService {
+  private readonly logger = new Logger(SubscriptionService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private gmailAuth: GmailAuthService,
+    private merchantAliasService: MerchantAliasService,
+  ) {}
+
+  private serialize(row: SubRow) {
+    return {
+      ...row,
+      amount: Number(row.amount),
+      nextDueDate: row.nextDueDate.toISOString().slice(0, 10),
+    };
+  }
+
+  /** Langganan berulang: jatuh tempo yang sudah lewat digulir ke kemunculan berikutnya (event Calendar sudah RRULE,
+   *  jadi tidak perlu disinkron ulang). Dipanggil sebelum membaca supaya UI tidak menampilkan "Lewat N hari" selamanya. */
+  private async rollStale(userId: number) {
+    const todayKey = wibDateKey(new Date());
+    const stale = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true, nextDueDate: { lt: new Date(`${todayKey}T00:00:00Z`) } },
+      select: { id: true, cycle: true, nextDueDate: true },
+    });
+    for (const s of stale) {
+      await this.prisma.subscription.updateMany({
+        where: { id: s.id, userId },
+        data: { nextDueDate: rollDueDate(s.nextDueDate, s.cycle, todayKey) },
+      });
+    }
+  }
+
+  async findAll(userId: number) {
+    await this.rollStale(userId);
+    const rows = await this.prisma.subscription.findMany({
+      where: { userId },
+      orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
+    });
+    return rows.map((r) => this.serialize(r as SubRow));
+  }
+
+  async create(userId: number, dto: CreateSubscriptionDto) {
+    const created = await this.prisma.subscription.create({
+      data: {
+        userId,
+        name: dto.name.trim(),
+        amount: dto.amount,
+        cycle: dto.cycle,
+        nextDueDate: new Date(dto.nextDueDate),
+        source: dto.source,
+        notes: dto.notes?.trim() || null,
+        reminderDaysBefore: dto.reminderDaysBefore ?? 3,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    const calendar = await this.syncCalendar(userId, created as SubRow);
+    return { ...this.serialize((calendar.row ?? created) as SubRow), calendarSync: calendar.status };
+  }
+
+  /** updateMany ber-userId (tak ada update-by-id polos) lalu baca ulang — dipakai semua jalur tulis. */
+  private async patch(userId: number, id: number, data: Prisma.SubscriptionUpdateManyMutationInput) {
+    await this.prisma.subscription.updateMany({ where: { id, userId }, data });
+    return this.prisma.subscription.findFirstOrThrow({ where: { id, userId } });
+  }
+
+  async update(userId: number, id: number, dto: UpdateSubscriptionDto) {
+    const existing = await this.prisma.subscription.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException('Langganan tidak ditemukan');
+
+    const updated = await this.patch(userId, id, {
+        ...(dto.name !== undefined && { name: dto.name.trim() }),
+        ...(dto.amount !== undefined && { amount: dto.amount }),
+        ...(dto.cycle !== undefined && { cycle: dto.cycle }),
+        ...(dto.nextDueDate !== undefined && { nextDueDate: new Date(dto.nextDueDate) }),
+        ...(dto.source !== undefined && { source: dto.source }),
+        ...(dto.notes !== undefined && { notes: dto.notes?.trim() || null }),
+        ...(dto.reminderDaysBefore !== undefined && { reminderDaysBefore: dto.reminderDaysBefore }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+    });
+
+    const calendar = await this.syncCalendar(userId, updated as SubRow);
+    return { ...this.serialize((calendar.row ?? updated) as SubRow), calendarSync: calendar.status };
+  }
+
+  async remove(userId: number, id: number) {
+    const existing = await this.prisma.subscription.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException('Langganan tidak ditemukan');
+
+    await this.deleteCalendarEvent(userId, existing.googleCalendarEventId);
+    await this.prisma.subscription.deleteMany({ where: { id, userId } });
+    return { success: true };
+  }
+
+  /** Saran langganan dari tagihan bulanan berulang 200 hari terakhir. Langganan yang sudah ada (termasuk nonaktif)
+   *  tidak disarankan lagi; "abaikan" disimpan di perangkat (frontend). */
+  async suggestions(userId: number) {
+    const now = new Date();
+    const [rows, existing] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: addWibDays(startOfWibDay(now), -200) } },
+        select: { description: true, merchantKey: true, amount: true, reimbursedAmount: true, occurredAt: true, source: true },
+      }),
+      this.prisma.subscription.findMany({ where: { userId }, select: { name: true, amount: true } }),
+    ]);
+    const named = await this.merchantAliasService.attachDisplayNames(userId, rows);
+    return detectRecurring(
+      named.map((t) => ({ description: t.description, displayName: t.displayDescription, merchantKey: t.merchantKey, amount: spend(t), occurredAt: t.occurredAt, source: t.source })),
+      existing,
+      wibDateKey(now),
+    );
+  }
+
+  /** Path feed .ics pribadi (frontend menambahkan URL API di depannya). */
+  async calendarLink(userId: number) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { tokenVersion: true } });
+    return { path: `/calendar/${calendarFile(userId, user.tokenVersion)}` };
+  }
+
+  /** Isi feed .ics untuk `<userId>-<sig>.ics`; null = tautan tidak valid / user nonaktif (controller → 404 tanpa detail). */
+  async calendarFeed(file: string): Promise<string | null> {
+    const parsed = parseCalendarFile(file);
+    if (!parsed) return null;
+    const user = await this.prisma.user.findUnique({ where: { id: parsed.userId }, select: { status: true, tokenVersion: true } });
+    if (!user || user.status !== 'ACTIVE' || !verifyCalendarSig(parsed.userId, user.tokenVersion, parsed.sig)) return null;
+    await this.rollStale(parsed.userId);
+    const subs = await this.prisma.subscription.findMany({ where: { userId: parsed.userId, isActive: true }, orderBy: { nextDueDate: 'asc' } });
+    return buildSubscriptionsIcs(subs);
+  }
+
+  /** Dipakai mascot: langganan aktif yang jatuh tempo dalam N hari. */
+  async getUpcomingReminders(userId: number, withinDays = 3) {
+    await this.rollStale(userId);
+    const rows = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true },
+      orderBy: { nextDueDate: 'asc' },
+    });
+    const now = startOfWibDay(new Date());
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    return rows
+      .map((s) => {
+        // nextDueDate: kolom @db.Date, sudah tengah malam UTC untuk tanggal itu — tidak perlu konversi WIB.
+        const due = s.nextDueDate;
+        const daysLeft = Math.round((due.getTime() - now.getTime()) / DAY_MS);
+        return { ...this.serialize(s as SubRow), daysLeft };
+      })
+      .filter((s) => s.daysLeft >= 0 && s.daysLeft <= withinDays);
+  }
+
+  private formatAmount(amount: number) {
+    return `Rp${amount.toLocaleString('id-ID')}`;
+  }
+
+  private toDateOnly(d: Date) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  private nextDay(dateStr: string) {
+    const d = new Date(`${dateStr}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  private buildEventBody(sub: SubRow) {
+    const amount = Number(sub.amount);
+    const start = this.toDateOnly(sub.nextDueDate);
+    const end = this.nextDay(start);
+    const cycleLabel = sub.cycle === 'YEARLY' ? 'tahunan' : 'bulanan';
+    const reminderDays = Math.max(0, sub.reminderDaysBefore);
+    const overrides: Array<{ method: 'popup'; minutes: number }> = [{ method: 'popup', minutes: 0 }];
+    if (reminderDays > 0) {
+      overrides.push({ method: 'popup', minutes: reminderDays * 24 * 60 });
+    }
+
+    return {
+      summary: `Langganan: ${sub.name} — ${this.formatAmount(amount)}`,
+      description: [
+        `Trackster reminder · ${cycleLabel}`,
+        sub.source ? `Rekening: ${sub.source}` : null,
+        sub.notes ? `Catatan: ${sub.notes}` : null,
+        'Dikelola dari Trackster. Edit di app biar Calendar ikut update.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      start: { date: start },
+      end: { date: end },
+      recurrence: [sub.cycle === 'YEARLY' ? 'RRULE:FREQ=YEARLY' : 'RRULE:FREQ=MONTHLY'],
+      reminders: {
+        useDefault: false,
+        overrides,
+      },
+    };
+  }
+
+  private async syncCalendar(userId: number, sub: SubRow): Promise<{ status: 'synced' | 'removed' | 'skipped' | 'error'; row?: SubRow; message?: string }> {
+    if (!sub.isActive) {
+      await this.deleteCalendarEvent(userId, sub.googleCalendarEventId);
+      if (sub.googleCalendarEventId) {
+        const row = await this.patch(userId, sub.id, { googleCalendarEventId: null });
+        return { status: 'removed', row: row as SubRow };
+      }
+      return { status: 'removed' };
+    }
+
+    const calendar = await this.gmailAuth.getCalendarClient(userId);
+    if (!calendar) {
+      return {
+        status: 'skipped',
+        message: 'Google belum terhubung. Hubungkan ulang di Setting supaya event Calendar dibuat.',
+      };
+    }
+
+    const body = this.buildEventBody(sub);
+
+    try {
+      if (sub.googleCalendarEventId) {
+        await calendar.events.update({
+          calendarId: 'primary',
+          eventId: sub.googleCalendarEventId,
+          requestBody: body,
+        });
+        return { status: 'synced', row: sub };
+      }
+
+      const created = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: body,
+      });
+      const eventId = created.data.id || null;
+      const row = await this.patch(userId, sub.id, { googleCalendarEventId: eventId });
+      return { status: 'synced', row: row as SubRow };
+    } catch (err) {
+      const message = (err as Error).message;
+      this.logger.warn(`Calendar sync gagal untuk subscription #${sub.id}: ${message}`);
+      return {
+        status: 'error',
+        message:
+          'Gagal sync ke Google Calendar. Pastikan Calendar API aktif di Google Cloud dan kamu sudah reconnect Google di Setting (scope calendar).',
+      };
+    }
+  }
+
+  private async deleteCalendarEvent(userId: number, eventId: string | null | undefined) {
+    if (!eventId) return;
+    const calendar = await this.gmailAuth.getCalendarClient(userId);
+    if (!calendar) return;
+    try {
+      await calendar.events.delete({ calendarId: 'primary', eventId });
+    } catch (err) {
+      this.logger.warn(`Gagal hapus calendar event ${eventId}: ${(err as Error).message}`);
+    }
+  }
+}

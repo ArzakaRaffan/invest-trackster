@@ -1,0 +1,27 @@
+import * as assert from 'node:assert/strict';
+import { InvestLedger, InvestReservation, Prisma } from '@prisma/client';
+import { accountBudget, creditBalance, holdingQuantity } from './invest-accounting';
+const D = Prisma.Decimal, now = new Date('2026-10-26T04:00:00Z'), asOf = '2026-10-26T03:00:00Z';
+const row = (fields: Partial<InvestLedger>) => ({ id: 'entry', allocationMonth: '2026-10', quotaDelta: new D(0), goalSavingDelta: new D(0), freeCashDelta: new D(0), investmentCashDelta: new D(0), quantityDelta: new D(0), occurredAt: new Date('2026-10-26T03:30:00Z'), createdAt: new Date('2026-10-26T03:30:00Z'), ...fields } as InvestLedger);
+const reserve = (fields: Partial<InvestReservation> = {}) => ({ allocationMonth: '2026-10', status: 'ACTIVE', expiresAt: new Date('2026-10-26T05:00:00Z'), amountIDR: new D('50'), ...fields } as InvestReservation);
+const base = { month: '2026-10', now, actualQuota: '200.00', cash: { amount: '150', asOf, valid: true }, ledger: [] as InvestLedger[], reservations: [] as InvestReservation[] };
+const purchase = row({ quotaDelta: new D('40.01'), freeCashDelta: new D('-40.01'), quantityDelta: new D('0.123456789012') });
+const saving = row({ id: 'saving', goalSavingDelta: new D('20'), freeCashDelta: new D('-20'), investmentCashDelta: new D('20') });
+const b = accountBudget({ ...base, ledger: [purchase, saving], reservations: [reserve()] });
+assert.equal(b.remainingQuota, '89.99'); assert.equal(b.freeCash, '39.99'); assert.equal(b.availableToAllocate, '39.99');
+assert.equal(b.usedQuota, '40.01'); assert.equal(b.goalSavingUsage, '20.00');
+assert.equal(accountBudget({ ...base, reservations: [reserve({ expiresAt: now })] }).reservations, '0.00');
+assert.equal(accountBudget({ ...base, reservations: [reserve({ status: 'CANCELLED' })] }).reservations, '0.00');
+assert.equal(accountBudget({ ...base, ledger: [purchase], actualQuota: '30' }).availableToAllocate, '0.00');
+assert.equal(accountBudget({ ...base, ledger: [purchase], cash: null }).availableToAllocate, null);
+assert.equal(accountBudget({ ...base, ledger: [row({ ...purchase, occurredAt: new Date(asOf) })] }).cashBackdated, true);
+assert.equal(accountBudget({ ...base, ledger: [purchase], cash: { ...base.cash, asOf: now.toISOString(), amount: '110' } }).freeCash, '110.00');
+assert.equal(accountBudget({ ...base, ledger: [row({ allocationMonth: '2026-09', quotaDelta: new D('40'), freeCashDelta: new D('-40') })] }).remainingQuota, '200.00');
+assert.equal(accountBudget({ ...base, ledger: [row({ investmentCashDelta: new D('1000') })] }).freeCash, '150.00'); // proceeds separate, no new quota
+assert.equal(holdingQuantity(new D('1'), [purchase]).toFixed(12), '1.123456789012');
+assert.equal(creditBalance(saving, [saving, row({ fundingEntryId: 'saving', investmentCashDelta: new D('-15') })]).toString(), '5');
+assert.equal(creditBalance(saving, [saving, row({ fundingEntryId: 'saving', investmentCashDelta: new D('-15') }), row({ reversalOfId: 'purchase', fundingEntryId: 'saving', investmentCashDelta: new D('15') })]).toString(), '20');
+assert.equal(holdingQuantity(new D('9999999999999999.123456789012'), [row({ quantityDelta: new D('0.000000000001') })]).toFixed(12), '9999999999999999.123456789013');
+assert.equal(accountBudget({ ...base, confirmedLedgerIds: [], ledger: [row({ ...purchase, createdAt: new Date(asOf) })] }).freeCash, '109.99');
+assert.equal(accountBudget({ ...base, confirmedLedgerIds: [purchase.id], ledger: [purchase] }).freeCash, '150.00');
+console.log('invest-accounting: 19 assertions passed');

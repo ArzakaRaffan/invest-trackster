@@ -1,0 +1,1205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  password     String
+  createdAt    DateTime   @default(now())
+  // multi-user: role/status default aman utk baris lama; backfill menjadikan user pertama ADMIN.
+  role         UserRole   @default(MEMBER)
+  status       UserStatus @default(ACTIVE)
+  displayName  String? // sapaan & prompt AI (pengganti "Arzaka")
+  fullName     String? // nama di rekening bank (pengganti OWNER_FULL_NAME)
+  email        String?    @unique
+  tokenVersion Int        @default(0) // naik = semua JWT lama tidak valid
+  lastLoginAt  DateTime?
+  onboardedAt  DateTime?
+
+  // relasi data tenant
+  transactions       Transaction[]
+  reimbursements     Reimbursement[]
+  dailyBudgets       DailyBudget[]
+  budgetSettings     BudgetSetting[]
+  dailyAllowances    DailyAllowance[]
+  emailSyncLogs      EmailSyncLog[]
+  emailParseLogs     EmailParseLog[]
+  telegramConfigs    TelegramConfig[]
+  gmailTokens        GmailToken[]
+  alertLogs          AlertLog[]
+  incomes            Income[]
+  incomeStreams      IncomeStream[]
+  bankBalances       BankBalance[]
+  balanceAdjustments BalanceAdjustment[]
+  merchantAliass     MerchantAlias[]
+  categoryIcons      CategoryIcon[]
+  healthScoreLogs    HealthScoreLog[]
+  budgetAdvices      BudgetAdvice[]
+  aiInsightCards     AiInsightCard[]
+  periodReports      PeriodReport[]
+  goals              Goal[]
+  subscriptions      Subscription[]
+  chatThreads        ChatThread[]
+  aiMemorys          AiMemory[]
+
+  ownAccounts        OwnAccount[]
+  apiTokens          ApiToken[]
+  inboundAddress     InboundAddress?
+  telegramLink       TelegramLink?
+  telegramLinkCodes  TelegramLinkCode[]
+  aiUsages           AiUsage[]
+  oneTimeTokens      OneTimeToken[]
+  invitesCreated     Invite[]             @relation("InviteCreatedBy")
+  invitesUsed        Invite[]             @relation("InviteUsedBy")
+  investMonths       InvestMonth[]
+  investEvents       InvestPaymentEvent[]
+  investReceipts     InvestReceiptLink[]
+  investEventAudits  InvestEventAudit[]
+  investGoals        InvestGoal[]
+  investProfiles     InvestRiskProfile[]
+  investHoldings     InvestHolding[]
+  investLedger       InvestLedger[]
+  investReservations InvestReservation[]
+  investMutations    InvestMutation[]
+  investChanges      InvestChange[]
+}
+
+enum InvestGoalStatus {
+  DRAFT
+  ACTIVE
+}
+
+enum InvestAssetClass {
+  CASH
+  BONDS
+  EQUITY
+  CRYPTO
+}
+
+enum InvestHoldingMode {
+  UNITS
+  VALUE
+}
+
+enum InvestMovementType {
+  PURCHASE
+  SALE
+  DISTRIBUTION
+  GOAL_SAVING
+  QUANTITY_ADJUSTMENT
+  REVERSAL
+}
+
+enum InvestReservationStatus {
+  ACTIVE
+  CANCELLED
+  SETTLED
+}
+
+model InvestGoal {
+  id                  String              @id @default(cuid())
+  userId              Int
+  user                User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  name                String              @db.VarChar(100)
+  targetAmountIDR     Decimal?            @db.Decimal(18, 2)
+  needDate            String?             @db.VarChar(10)
+  liquidityDays       Int?
+  status              InvestGoalStatus    @default(DRAFT)
+  holdingsDeclaration String              @default("UNKNOWN") @db.VarChar(10)
+  capacityRevision    Int                 @default(0)
+  version             Int                 @default(1)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  profiles            InvestRiskProfile[]
+  holdings            InvestHolding[]
+  ledger              InvestLedger[]
+  reservations        InvestReservation[]
+
+  // One ACTIVE per user is additionally enforced by a partial unique index in the migration.
+  @@unique([id, userId])
+  @@index([userId, status])
+}
+
+model InvestRiskProfile {
+  id                    String     @id @default(cuid())
+  userId                Int
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goalId                String
+  goal                  InvestGoal @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
+  version               Int
+  goalVersion           Int
+  answers               Json
+  result                Json
+  ruleset               String
+  reviewHash            String     @db.VarChar(64)
+  conflictsAcknowledged Boolean    @default(false)
+  confirmedAt           DateTime?
+  createdAt             DateTime   @default(now())
+
+  @@unique([userId, goalId, version])
+}
+
+model InvestHolding {
+  id              String            @id @default(cuid())
+  userId          Int
+  user            User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goalId          String
+  goal            InvestGoal        @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
+  label           String            @db.VarChar(100)
+  assetClass      InvestAssetClass
+  currency        String            @db.VarChar(3)
+  mode            InvestHoldingMode
+  openingQuantity Decimal?          @db.Decimal(28, 12)
+  openingAt       DateTime
+  costBasisIDR    Decimal?          @db.Decimal(18, 2)
+  unitPrice       Decimal?          @db.Decimal(28, 12)
+  value           Decimal?          @db.Decimal(18, 2)
+  valuationAt     DateTime
+  fxToIDR         Decimal?          @db.Decimal(28, 12)
+  fxAsOf          DateTime?
+  valuationNote   String            @db.VarChar(300)
+  version         Int               @default(1)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ledger          InvestLedger[]
+
+  @@unique([id, userId])
+  @@index([userId, goalId])
+}
+
+model InvestLedger {
+  id                   String             @id @default(cuid())
+  userId               Int
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goalId               String
+  goal                 InvestGoal         @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
+  holdingId            String?
+  holding              InvestHolding?     @relation(fields: [holdingId, userId], references: [id, userId], onDelete: Restrict)
+  type                 InvestMovementType
+  allocationMonth      String             @db.VarChar(7)
+  occurredAt           DateTime
+  principalIDR         Decimal            @db.Decimal(18, 2)
+  feeIDR               Decimal            @db.Decimal(18, 2)
+  quantityDelta        Decimal            @db.Decimal(28, 12)
+  quotaDelta           Decimal            @db.Decimal(18, 2)
+  goalSavingDelta      Decimal            @db.Decimal(18, 2)
+  freeCashDelta        Decimal            @db.Decimal(18, 2)
+  investmentCashDelta  Decimal            @db.Decimal(18, 2)
+  fundingEntryId       String?
+  reversalOfId         String?
+  receiptTransactionId Int?
+  receiptIncomeId      Int?
+  outOfPolicy          Boolean            @default(false)
+  reason               String             @db.VarChar(300)
+  createdAt            DateTime           @default(now())
+
+  // Source refs survive edits/deletes in Trackster; no cascading changes to financial history.
+  @@unique([userId, reversalOfId])
+  @@index([userId, allocationMonth])
+  @@index([userId, goalId, createdAt])
+  @@index([userId, holdingId])
+  @@index([userId, fundingEntryId])
+}
+
+// Creation is reserved for the server-side ACTUAL evaluation in I3; no client-supplied orders.
+model InvestReservation {
+  id              String                  @id @default(cuid())
+  userId          Int
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goalId          String
+  goal            InvestGoal              @relation(fields: [goalId, userId], references: [id, userId], onDelete: Restrict)
+  allocationMonth String                  @db.VarChar(7)
+  evaluationId    String
+  inputRevision   String                  @db.VarChar(64)
+  amountIDR       Decimal                 @db.Decimal(18, 2)
+  status          InvestReservationStatus @default(ACTIVE)
+  expiresAt       DateTime
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([userId, allocationMonth, status])
+}
+
+model InvestMutation {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  route     String   @db.VarChar(150)
+  key       String   @db.VarChar(80)
+  bodyHash  String   @db.VarChar(64)
+  response  Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, route, key])
+}
+
+model InvestChange {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entityId  String
+  kind      String   @db.VarChar(40)
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  @@index([userId, entityId, createdAt])
+}
+
+// Invest I0/I1: additive, no writes to Income, BankBalance or weekly budgets.
+model InvestMonth {
+  id                String   @id @default(cuid())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  month             String   @db.VarChar(7)
+  version           Int      @default(1)
+  cashAmount        Decimal  @db.Decimal(18, 2)
+  cashConfirmedAt   DateTime @default(now())
+  financialRevision String   @db.VarChar(64)
+  cashLedgerIds     String[] @default([])
+
+  @@unique([userId, month])
+}
+
+enum InvestPaymentStatus {
+  SCHEDULED
+  PARTIAL
+  COMPLETED
+  CANCELLED
+  MISSED
+  NEEDS_RECONCILIATION
+}
+
+model InvestPaymentEvent {
+  id            String              @id @default(cuid())
+  userId        Int
+  user          User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  eventKey      String              @db.VarChar(100)
+  originalMonth String              @db.VarChar(7)
+  scheduledDate String              @db.VarChar(10)
+  streamId      Int
+  streamName    String
+  expected      Decimal             @db.Decimal(18, 2)
+  conservative  Decimal             @db.Decimal(18, 2)
+  maximum       Decimal             @db.Decimal(18, 2)
+  status        InvestPaymentStatus @default(SCHEDULED)
+  version       Int                 @default(1)
+  reason        String
+  updatedAt     DateTime            @updatedAt
+  links         InvestReceiptLink[]
+
+  // Source IDs deliberately have no FK into legacy tables: deleting a receipt/stream must
+  // preserve the Invest audit. Reads revalidate source IDs and fingerprints, scoped to userId.
+  @@unique([userId, eventKey])
+  @@unique([id, userId])
+  @@index([userId, originalMonth])
+  @@index([userId, scheduledDate])
+}
+
+model InvestReceiptLink {
+  id              String             @id @default(cuid())
+  userId          Int
+  user            User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  eventId         String
+  event           InvestPaymentEvent @relation(fields: [eventId, userId], references: [id, userId], onDelete: Cascade)
+  incomeId        Int
+  receiptRevision String             @db.VarChar(64)
+  createdAt       DateTime           @default(now())
+
+  @@unique([userId, incomeId])
+  @@index([userId, eventId])
+}
+
+model InvestEventAudit {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  eventKey  String   @db.VarChar(100)
+  version   Int
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventKey, version])
+}
+
+model Transaction {
+  id               Int             @id @default(autoincrement())
+  amount           Decimal         @db.Decimal(12, 2)
+  description      String
+  source           Source
+  // Buat transaksi dari sync email, ini Gmail message ID (dedup key asli). Buat transaksi manual,
+  // di-generate sintetis ("manual:<uuid>") karena kolomnya unique non-null — tidak dipakai buat dedup.
+  emailId          String
+  occurredAt       DateTime
+  createdAt        DateTime        @default(now())
+  note             String?
+  category         Category        @default(LAINNYA)
+  isManual         Boolean         @default(false)
+  // Nominal ini sedang ikut di saldo BankBalance & belum diserap koreksi manual. false = dilewati aturan baseline saat
+  // dibuat, atau sudah tercakup koreksi manual sesudahnya. Hapus transaksi hanya membalikkan saldo kalau true.
+  balanceApplied   Boolean         @default(true)
+  // Kunci normalisasi merchant (lowercase, tanpa digit/tanda baca/"qr", ≤3 kata pertama) —
+  // dipakai groupBy merchant di analisis & lookup rule kategori. Lihat merchantKey() di
+  // merchant-key.util.ts. Nullable karena transaksi lama di-backfill terpisah (bukan migration).
+  merchantKey      String?
+  // Caption satu-baris digenerate AI (fast model) buat feed transaksi — kosmetik, nullable,
+  // gagal generate tidak boleh gagalkan pencatatan transaksi. Lihat AiCaptionService.
+  aiCaption        String?
+  // Override manual "pembelian besar" (E06-S1). null = pakai aturan otomatis
+  // (>= max(300rb, 5x median 90 hari)); true/false = ditandai eksplisit lewat tombol di detail transaksi.
+  isBig            Boolean?
+  // Total patungan yang SUDAH diterima (Reimbursement RECEIVED) — didenormalisasi biar _sum/groupBy
+  // SQL tetap jalan. `amount` tetap bruto (= uang keluar dari bank); pengeluaran efektif = amount - reimbursedAmount.
+  reimbursedAmount Decimal         @default(0) @db.Decimal(12, 2)
+  reimbursements   Reimbursement[]
+  // Split bill (akun) yang dibuat dari transaksi ini — peserta selain pembuat jadi Reimbursement tertaut.
+  splitBill        SplitBill?
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, emailId])
+  @@index([occurredAt])
+  @@index([merchantKey])
+  @@index([userId, occurredAt]) // semua query per user memfilter rentang waktu; unik (userId, emailId) sudah menutup lookup userId saja
+}
+
+enum ReimbursementStatus {
+  PENDING
+  RECEIVED
+}
+
+// Patungan: orang lain menggantikan sebagian transaksi yang kita talangi. BUKAN Income — tidak
+// masuk statistik/forecast pemasukan. PENDING = cuma piutang (tidak ngubah pengeluaran/saldo);
+// RECEIVED = ngurangin pengeluaran efektif transaksinya + nambah saldo `receivedSource`.
+model Reimbursement {
+  id                 Int                   @id @default(autoincrement())
+  transactionId      Int
+  transaction        Transaction           @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  personName         String
+  amount             Decimal               @db.Decimal(12, 2)
+  status             ReimbursementStatus   @default(PENDING)
+  receivedAt         DateTime?
+  receivedSource     Source?
+  // Apakah saldo benar-benar digerakkan saat RECEIVED (aturan baseline bisa skip) — dipakai
+  // supaya pembalikan (batal / hapus transaksi) persis simetris.
+  balanceApplied     Boolean               @default(false)
+  // Tertaut ke peserta split bill (sinkron dua arah: lunas di split bill <-> diterima di sini). Patungan tertaut
+  // HANYA mengurangi pengeluaran, tidak menggerakkan saldo (uangnya tercatat lewat email bank/income) — balanceApplied=false.
+  splitParticipantId Int?                  @unique
+  splitParticipant   SplitBillParticipant? @relation(fields: [splitParticipantId], references: [id], onDelete: SetNull)
+  createdAt          DateTime              @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([status])
+  @@index([userId])
+}
+
+enum Source {
+  BCA
+  JAGO
+  GOPAY
+  BNI
+  MANDIRI
+  RAYA
+  BRI
+}
+
+enum Category {
+  MAKANAN
+  TRANSPORT
+  BELANJA
+  TAGIHAN
+  HIBURAN
+  KESEHATAN
+  LAINNYA
+  TRANSFER
+  TOPUP
+  PENDIDIKAN
+  PERAWATAN
+  INVESTASI
+  ROKOK
+}
+
+model DailyBudget {
+  id        Int      @id @default(autoincrement())
+  dayOfWeek Int // 0=Minggu ... 6=Sabtu
+  amount    Decimal  @db.Decimal(12, 2)
+  updatedAt DateTime @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, dayOfWeek])
+  @@index([userId])
+}
+
+/// Satu baris (id=1). Setting budget yang bukan angka per hari.
+model BudgetSetting {
+  id              Int           @id @default(autoincrement())
+  /// Sisa budget hari-hari sebelumnya (dalam minggu Senin–Minggu yang sama) ikut ditambahkan ke budget hari ini.
+  rolloverEnabled Boolean       @default(false)
+  /// FIXED = nominal DailyBudget per hari (perilaku lama). CYCLE/BALANCE = jatah dinamis (docs/siklus-gajian.md).
+  mode            BudgetMode    @default(FIXED)
+  /// Income utama penentu siklus (mode CYCLE). Stream dihapus -> null.
+  anchorStreamId  Int?
+  anchorStream    IncomeStream? @relation(fields: [anchorStreamId], references: [id], onDelete: SetNull)
+  /// Cadangan tabungan (%) dari pemasukan siklus.
+  reservePct      Int           @default(10)
+  /// Mode BALANCE: saldo dibagi ke sekian hari.
+  horizonDays     Int           @default(30)
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId])
+  @@index([userId])
+}
+
+enum BudgetMode {
+  FIXED
+  CYCLE
+  BALANCE
+}
+
+/// Snapshot jatah harian mode CYCLE/BALANCE (jatahnya dinamis, tidak bisa direkonstruksi dari DailyBudget).
+/// Ditulis getTodaySummary() + cron 00:05 WIB; dibaca analytics (kepatuhan budget). Hari tanpa baris = mode FIXED.
+model DailyAllowance {
+  id     Int      @id @default(autoincrement())
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, date])
+}
+
+model EmailSyncLog {
+  id         Int      @id @default(autoincrement())
+  lastSyncAt DateTime
+  status     String // SUCCESS | ERROR
+  message    String?
+  createdAt  DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+}
+
+enum ParseStatus {
+  RECORDED
+  EXCLUDED
+  UNPARSED
+  DUPLICATE
+  ERROR
+  SHADOW // inbound shadow mode: di-parse tapi tidak ditulis ke Transaction/Income/saldo
+}
+
+// Hasil parse tiap email yang discan sync, satu baris per emailId — biar email yang gagal
+// parse (mis. format baru yang belum dikenal) kelihatan by name, bukan cuma angka skip=N.
+model EmailParseLog {
+  id           Int         @id @default(autoincrement())
+  emailId      String
+  from         String
+  subject      String
+  receivedAt   DateTime
+  status       ParseStatus
+  reason       String?
+  amount       Decimal?    @db.Decimal(12, 2)
+  counterparty String?
+  kind         String? // 'EXPENSE' | 'INCOME' (E02)
+  parser       String? // 'bca' | 'jago' | 'flip' | 'bni' | 'mandiri' | 'raya' | 'bri'
+  createdAt    DateTime    @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, emailId])
+  @@index([status])
+  @@index([receivedAt])
+  @@index([userId, receivedAt])
+}
+
+model TelegramConfig {
+  id                     Int      @id @default(autoincrement())
+  botToken               String
+  chatId                 String
+  isActive               Boolean  @default(true)
+  notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
+  updatedAt              DateTime @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+}
+
+model GmailToken {
+  id           Int      @id @default(autoincrement())
+  refreshToken String
+  email        String
+  updatedAt    DateTime @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+}
+
+model AlertLog {
+  id     Int      @id @default(autoincrement())
+  date   DateTime @db.Date
+  sentAt DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model Income {
+  id          Int      @id @default(autoincrement())
+  amount      Decimal  @db.Decimal(12, 2)
+  description String
+  source      Source
+  receivedAt  DateTime
+  createdAt   DateTime @default(now())
+
+  streamId    Int?
+  stream      IncomeStream? @relation(fields: [streamId], references: [id])
+  periodStart DateTime?     @db.Date // minggu (Senin) / bulan yang "dibayar" oleh income ini
+  units       Decimal?      @db.Decimal(4, 1) // SESSION: sesi; DEDUCTION: hari absen
+  extraUnits  Decimal?      @db.Decimal(4, 1) // SESSION: sesi offline (dapat transport)
+  status      IncomeStatus  @default(CONFIRMED)
+  origin      IncomeOrigin  @default(MANUAL)
+  externalId  String? // Gmail message ID / hash notifikasi -> dedup auto-capture (E02)
+  balanceApplied Boolean @default(true) // sama dengan Transaction.balanceApplied
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, externalId])
+  @@index([receivedAt])
+  @@index([streamId, periodStart])
+  @@index([userId, receivedAt])
+}
+
+enum IncomeKind {
+  FIXED // nominal tetap (uang mingguan)
+  SESSION // per sesi + ekstra per sesi offline (les privat)
+  DEDUCTION // nominal maks dikurangi per unit absen (magang)
+  VARIABLE // nominal berubah, rutin (Ruangguru bulanan)
+  IRREGULAR // tak tentu (project) - tidak masuk forecast dasar
+}
+
+enum IncomeCadence {
+  WEEKLY
+  MONTHLY
+  NONE
+}
+
+// PENDING = auto-capture perlu dicek; INTERNAL = uang masuk dari rekening sendiri (E02).
+// Statistik cuma hitung CONFIRMED.
+enum IncomeStatus {
+  CONFIRMED
+  PENDING
+  INTERNAL
+}
+
+enum IncomeOrigin {
+  MANUAL
+  CHECKIN
+  EMAIL
+  NOTIFICATION
+}
+
+model IncomeStream {
+  id               Int             @id @default(autoincrement())
+  name             String
+  kind             IncomeKind
+  cadence          IncomeCadence
+  source           Source // rekening tujuan default
+  payDayOfWeek     Int? // WEEKLY: 0=Min..6=Sab, hari biasanya diterima
+  payDayOfMonth    Int? // MONTHLY: mis. 25
+  amount           Decimal?        @db.Decimal(12, 2) // FIXED: nominal; DEDUCTION: maks; VARIABLE: estimasi awal
+  sessionRate      Decimal?        @db.Decimal(12, 2) // SESSION: rate per sesi
+  sessionExtra     Decimal?        @db.Decimal(12, 2) // SESSION: transport per sesi offline
+  maxUnits         Int? // SESSION: maks sesi/minggu; DEDUCTION: hari kerja/minggu
+  deductionPerUnit Decimal?        @db.Decimal(12, 2) // DEDUCTION: nominal dipotong per hari absen
+  typicalUnits     Decimal?        @db.Decimal(4, 1) // tebakan awal sebelum ada histori
+  matchKeywords    String[] // nama pengirim buat auto-link (E02)
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  incomes          Income[]
+  budgetAnchors    BudgetSetting[]
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+}
+
+model BankBalance {
+  id            Int      @id @default(autoincrement())
+  source        Source
+  balance       Decimal  @db.Decimal(12, 2)
+  lastUpdatedAt DateTime @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, source])
+  @@index([userId])
+}
+
+// Log tiap kali saldo bergerak lewat koreksi manual (bukan lewat transaksi/income normal) —
+// dipakai buat histori "kenapa saldo tiba-tiba beda dari perkiraan".
+model BalanceAdjustment {
+  id        Int      @id @default(autoincrement())
+  source    Source
+  delta     Decimal  @db.Decimal(12, 2)
+  note      String?
+  createdAt DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([source])
+  @@index([userId])
+}
+
+// Nama panggilan buat merchant, terikat ke Transaction.description via string match (bukan FK) —
+// jadi berlaku otomatis ke semua transaksi lama & baru yang description-nya persis sama.
+model MerchantAlias {
+  id             Int       @id @default(autoincrement())
+  rawDescription String
+  // Nullable: alias bisa dibuat cuma buat nyimpen rule kategori tanpa ganti nama tampilan.
+  displayName    String?
+  // Kategori tetap untuk merchant ini — dipakai pipeline kategorisasi sync (rule dulu,
+  // sebelum heuristik/AI) dan "terapkan ke semua" saat user koreksi kategori.
+  category       Category?
+  // Logo pilihan user: path relatif di frontend/public/icons (mis. "indonesia/bca.svg"). Null = inisial huruf.
+  icon           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, rawDescription])
+  @@index([userId])
+}
+
+// Logo per kategori (kategori itu enum tetap, jadi cukup 1 baris per kategori yang dihias).
+model CategoryIcon {
+  category Category
+  icon     String
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([userId, category])
+  @@index([userId])
+}
+
+// Split Bill: fitur berdiri sendiri buat bagi tagihan makan bareng teman, SENGAJA tidak
+// terhubung ke Transaction/BankBalance sama sekali — lihat CLAUDE.md soal kenapa saldo
+// harus tetap "live incremental" tanpa campur tangan alur lain.
+model SplitBill {
+  id               Int      @id @default(autoincrement())
+  publicSlug       String   @unique
+  restaurantName   String
+  billDate         DateTime
+  taxAmount        Decimal  @default(0) @db.Decimal(12, 2)
+  serviceFeeAmount Decimal  @default(0) @db.Decimal(12, 2)
+  // null = bill dibuat publik tanpa login (lihat ownerToken di bawah). Bill yang dibuat lewat
+  // akun tetap keiket ke createdByUserId seperti biasa, ownerToken-nya null.
+  createdByUserId  Int?
+  createdAt        DateTime @default(now())
+
+  // Secret kedua, TERPISAH dari publicSlug — cuma dikasih ke pembuat bill anonim sekali waktu
+  // create, dipakai buat kelola (reassign item) TANPA login. publicSlug tetap cuma buat
+  // teman lihat & tandai lunas — jangan disatukan, nanti teman bisa ikut ngedit assignment.
+  ownerToken String? @unique
+
+  // Rekening orang yang nalangin duluan — ditampilkan di halaman publik biar temen tau
+  // harus transfer ke mana. Semua opsional, kosong berarti nggak ditampilkan.
+  payerBankName      String?
+  payerAccountNumber String?
+  payerAccountName   String?
+
+  taxPercent      Decimal? @db.Decimal(5, 2)
+  servicePercent  Decimal? @db.Decimal(5, 2)
+  discountAmount  Decimal? @db.Decimal(12, 2)
+  discountPercent Decimal? @db.Decimal(5, 2)
+  deliveryFee     Decimal? @db.Decimal(12, 2)
+  roundingUnit    Int      @default(0)
+  taxAfterService Boolean  @default(false)
+
+  participants SplitBillParticipant[]
+  items        SplitBillItem[]
+
+  // Opsional (hanya bill milik akun): pengeluaran yang dibagi. Peserta pertama = pembuat (yang menalangi).
+  transactionId Int?         @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+}
+
+model SplitBillParticipant {
+  id          Int       @id @default(autoincrement())
+  splitBillId Int
+  splitBill   SplitBill @relation(fields: [splitBillId], references: [id], onDelete: Cascade)
+  name        String
+  // Spec avatar kartun pilihan user ("gaya.kulit.rambut.latar.baju.kacamata"); null = diturunkan dari nama di frontend.
+  avatar      String?
+  isPaid      Boolean   @default(false)
+  paidAt      DateTime?
+
+  items         SplitBillItem[]
+  shares        SplitBillItemShare[]
+  reimbursement Reimbursement?
+
+  @@index([splitBillId])
+}
+
+model SplitBillItem {
+  id            Int                   @id @default(autoincrement())
+  splitBillId   Int
+  splitBill     SplitBill             @relation(fields: [splitBillId], references: [id], onDelete: Cascade)
+  description   String
+  amount        Decimal               @db.Decimal(12, 2) // harga per unit, dikali quantity buat dapet total baris
+  quantity      Int                   @default(1)
+  participantId Int?
+  participant   SplitBillParticipant? @relation(fields: [participantId], references: [id])
+  shares        SplitBillItemShare[]
+
+  @@index([splitBillId])
+  @@index([participantId])
+}
+
+model SplitBillItemShare {
+  id            Int                  @id @default(autoincrement())
+  itemId        Int
+  item          SplitBillItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  participantId Int
+  participant   SplitBillParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  weight        Decimal              @default(1) @db.Decimal(6, 2)
+
+  @@unique([itemId, participantId])
+}
+
+// Patungan Trip (E08-S4): group expense ala Splitwise. Banyak pengeluaran, banyak pembayar,
+// akhir cukup transfer seminimal mungkin. Pola publicSlug (lihat + tandai) vs ownerToken (kelola)
+// sama seperti SplitBill, sengaja terpisah & tidak terhubung ke Transaction/BankBalance.
+model Trip {
+  id              Int      @id @default(autoincrement())
+  publicSlug      String   @unique
+  ownerToken      String?  @unique
+  name            String
+  currency        String   @default("IDR")
+  createdByUserId Int?
+  createdAt       DateTime @default(now())
+
+  members  TripMember[]
+  expenses TripExpense[]
+}
+
+model TripMember {
+  id     Int     @id @default(autoincrement())
+  tripId Int
+  trip   Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name   String
+  // Spec avatar kartun pilihan pembuat trip (lihat SplitBillParticipant.avatar); null = diturunkan dari nama di frontend.
+  avatar String?
+
+  expensesPaid TripExpense[]
+  shares       TripExpenseShare[]
+
+  @@index([tripId])
+}
+
+model TripExpense {
+  id             Int        @id @default(autoincrement())
+  tripId         Int
+  trip           Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  paidByMemberId Int
+  paidBy         TripMember @relation(fields: [paidByMemberId], references: [id], onDelete: Cascade)
+  amount         Decimal    @db.Decimal(12, 2)
+  description    String
+  date           DateTime   @default(now())
+
+  shares TripExpenseShare[]
+
+  @@index([tripId])
+  @@index([paidByMemberId])
+}
+
+model TripExpenseShare {
+  id        Int         @id @default(autoincrement())
+  expenseId Int
+  expense   TripExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  memberId  Int
+  member    TripMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  weight    Decimal     @default(1) @db.Decimal(6, 2)
+
+  @@unique([expenseId, memberId])
+}
+
+model HealthScoreLog {
+  id                 Int      @id @default(autoincrement())
+  weekStart          DateTime @db.Date
+  score              Int // 0-100, dihitung algoritmik (bukan dari LLM)
+  budgetAdherencePct Decimal  @db.Decimal(5, 2)
+  savingsRatePct     Decimal  @db.Decimal(5, 2)
+  aiCommentary       String? // 1 kalimat dari LLM, opsional — kalau call gagal skor tetap tersimpan
+  createdAt          DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, weekStart])
+  @@index([userId])
+}
+
+// Cache narasi budget advisor (E05-S2): "Saran Track" per minggu — dipilih AI dari 3 opsi
+// deterministik (budget-advisor.ts), bukan AI yang menghitung angkanya.
+model BudgetAdvice {
+  id          Int      @id @default(autoincrement())
+  weekStart   DateTime @db.Date
+  recommended String // 'hemat' | 'seimbang' | 'longgar'
+  reason      String?
+  tip         String?
+  createdAt   DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, weekStart])
+  @@index([userId])
+}
+
+model AiInsightCard {
+  id        Int      @id @default(autoincrement())
+  rangeKey  String // '7d' | '30d' | '90d' | 'all'
+  dayKey    String // wibDateKey(now) — cache per hari WIB
+  points    Json // string[] — 3 poin insight
+  createdAt DateTime @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, rangeKey, dayKey])
+  @@index([userId])
+}
+
+enum ReportPeriod {
+  WEEK
+  MONTH
+}
+
+// Snapshot laporan periode yang sudah tutup (E07-S1) — angka & narasi dibekukan
+// di waktu tutup, konsisten walau data berubah kemudian (koreksi, kategori ulang, dll).
+model PeriodReport {
+  id          Int          @id @default(autoincrement())
+  period      ReportPeriod
+  periodStart DateTime     @db.Date
+  stats       Json // PeriodStats saat periode ditutup
+  narrative   String? // ringkasan Track (markdown pendek)
+  generatedAt DateTime     @default(now())
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, period, periodStart])
+  @@index([userId])
+}
+
+model Goal {
+  id            Int                @id @default(autoincrement())
+  name          String
+  targetAmount  Decimal            @db.Decimal(12, 2)
+  targetDate    DateTime?          @db.Date
+  archivedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  contributions GoalContribution[]
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+}
+
+model GoalContribution {
+  id        Int      @id @default(autoincrement())
+  goalId    Int
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(12, 2) // positif = nambah, negatif = tarik (koreksi)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([goalId])
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+// Langganan dikelola manual (bukan auto-detect dari transaksi).
+// Reminder lewat Google Calendar event berulang; googleCalendarEventId diisi setelah sync sukses.
+model Subscription {
+  id                    Int          @id @default(autoincrement())
+  name                  String
+  amount                Decimal      @db.Decimal(12, 2)
+  cycle                 BillingCycle @default(MONTHLY)
+  nextDueDate           DateTime     @db.Date
+  source                Source?
+  notes                 String?
+  reminderDaysBefore    Int          @default(3)
+  isActive              Boolean      @default(true)
+  googleCalendarEventId String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([nextDueDate])
+  @@index([isActive])
+  @@index([userId])
+}
+
+enum ChatChannel {
+  WEB
+  TELEGRAM
+}
+
+// Percakapan "Tanya Track". Telegram cuma punya satu thread persisten per channel.
+model ChatThread {
+  id            Int           @id @default(autoincrement())
+  title         String?
+  channel       ChatChannel   @default(WEB)
+  summary       String?
+  summaryUpToId Int?
+  archivedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  messages      ChatMessage[]
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([channel])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          Int                      @id @default(autoincrement())
+  threadId    Int
+  thread      ChatThread               @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role        String // 'user' | 'assistant' | 'tool'
+  content     String                   @default("")
+  toolCalls   Json?
+  toolCallId  String?
+  toolName    String?
+  attachments Json?
+  createdAt   DateTime                 @default(now())
+  search      Unsupported("tsvector")?
+
+  @@index([threadId, id])
+}
+
+enum MemoryKind {
+  PROFILE
+  GOAL
+  PLAN
+  PREFERENCE
+  CONCERN
+  EVENT
+  DECISION
+}
+
+// Fakta tahan lama tentang Arzaka (bukan angka yang sudah ada di DB lain) — disuntik ke system
+// prompt tiap chat (E04-S2). Diisi otomatis (ekstraksi async tiap balasan) atau manual lewat
+// tool remember/forget & halaman "Yang Track ingat".
+model AiMemory {
+  id              Int        @id @default(autoincrement())
+  kind            MemoryKind
+  content         String
+  importance      Int        @default(2) // 1 rendah .. 3 tinggi
+  sourceMessageId Int?
+  validUntil      DateTime? // EVENT/PLAN yang ada tanggalnya — lewat = auto-archive
+  archivedAt      DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([archivedAt])
+  @@index([userId])
+}
+
+// ============================================================================
+// Multi-user (expand): tabel baru. Belum dipakai kode runtime sampai fase terkait (lihat docs/multi-user/03-Roadmap.md).
+// ============================================================================
+
+// Undangan sekali pakai. Hanya HASH kode yang disimpan (kode plaintext hanya tampil sekali di CLI).
+model Invite {
+  id              Int       @id @default(autoincrement())
+  codeHash        String    @unique
+  createdByUserId Int
+  createdBy       User      @relation("InviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  forUsernameHint String?
+  expiresAt       DateTime
+  usedAt          DateTime?
+  usedByUserId    Int?
+  usedBy          User?     @relation("InviteUsedBy", fields: [usedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime  @default(now())
+
+  @@index([createdByUserId])
+}
+
+enum OneTimeTokenKind {
+  RESET_PASSWORD
+}
+
+// Token sekali pakai buatan admin (reset password, P14). Hanya hash yang disimpan.
+model OneTimeToken {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  kind      OneTimeTokenKind
+  tokenHash String           @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+}
+
+// Token API per user (Shortcut iPhone / input manual). Plaintext `trk_...` tampil sekali; simpan hash saja.
+model ApiToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  label      String
+  tokenHash  String    @unique
+  prefix     String // beberapa karakter pertama utk tampilan, bukan rahasia
+  scopes     String[]  @default(["INGEST"])
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+// Alamat email unik per user utk forwarding email bank (Cloudflare Email Routing). localPart acak, tak bisa ditebak.
+model InboundAddress {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  localPart         String    @unique
+  gmailSource       String? // alamat Gmail pengirim-forward milik user
+  forwardVerifiedAt DateTime?
+  lastEmailAt       DateTime?
+  lastForwardCode   String?
+  lastForwardCodeAt DateTime?
+  isActive          Boolean   @default(true)
+  shadow            Boolean   @default(false) // true = parse & catat log saja, tidak menulis Transaction/Income/saldo
+  rotatedAt         DateTime?
+  createdAt         DateTime  @default(now())
+}
+
+// Rekening milik user (pengganti env OWNER_ACCOUNT_NUMBERS): dipakai parser mengenali transfer ke diri sendiri.
+model OwnAccount {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  source        Source?
+  label         String?
+  accountNumber String // digit saja
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, accountNumber])
+}
+
+// Bot Telegram bersama: satu chat terhubung ke satu user (menggantikan TelegramConfig per-user).
+model TelegramLink {
+  id                     Int      @id @default(autoincrement())
+  userId                 Int      @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  chatId                 String   @unique
+  isActive               Boolean  @default(true)
+  notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
+  linkedAt               DateTime @default(now())
+}
+
+model TelegramLinkCode {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Penghitung pemakaian AI per user per hari WIB (kuota).
+model AiUsage {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  dayKey String // wibDateKey
+  kind   String // 'CHAT' | ...
+  count  Int    @default(0)
+
+  @@unique([userId, dayKey, kind])
+}

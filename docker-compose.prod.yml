@@ -1,0 +1,145 @@
+# Log kontainer dirotasi (default json-file tanpa batas → disk VPS bisa penuh oleh log).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trackster
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: trackster
+    volumes:
+      - trackster_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U trackster']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+      - shared-web-net
+    ports:
+      - '127.0.0.1:5432:5432'
+
+  backend:
+    image: ghcr.io/arzakaraffan/trackster-backend:${IMAGE_TAG:-latest}
+    logging: *default-logging
+    # Proses Node tak butuh capability Linux apa pun (port >1024, user node) & tak boleh naik hak akses.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./apps/backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      DATABASE_URL: postgresql://trackster:${POSTGRES_PASSWORD}@postgres:5432/trackster
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      OWNER_FULL_NAME: ${OWNER_FULL_NAME}
+      OWNER_ACCOUNT_NUMBERS: ${OWNER_ACCOUNT_NUMBERS}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET}
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI}
+      FRONTEND_URL: ${FRONTEND_URL}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      BACKEND_PORT: 4000
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=512 # heap normal ±150–250MB; batas ini mencegah satu proses menghabiskan RAM VPS
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_MODEL_FAST: ${AI_MODEL_FAST}
+      SPLITBILL_AI_BASE_URL: ${SPLITBILL_AI_BASE_URL}
+      SPLITBILL_AI_API_KEY: ${SPLITBILL_AI_API_KEY}
+      SPLITBILL_AI_MODEL: ${SPLITBILL_AI_MODEL}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      INGEST_HMAC_SECRET: ${INGEST_HMAC_SECRET}
+      INBOUND_DOMAIN: ${INBOUND_DOMAIN}
+    volumes:
+      - trackster_backups:/backups:ro # BackupMonitorService: Telegram ke pemilik bila backup harian basi
+    expose:
+      - '4000'
+
+  # Backup harian ±03:00 WIB + sebelum tiap deploy (deploy.yml). Image sama dengan postgres (tak ada unduhan baru); skrip dari repo.
+  db-backup:
+    image: postgres:16-alpine
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ['sh', '/scripts/backup.sh']
+    command: ['loop'] # deploy.yml: `run db-backup once predeploy` mengganti command ini
+    volumes:
+      - ./infra/db-backup:/scripts:ro
+      - trackster_backups:/backups
+
+  frontend:
+    image: ghcr.io/arzakaraffan/trackster-frontend:${IMAGE_TAG:-latest}
+    logging: *default-logging
+    # Proses Node tak butuh capability Linux apa pun (port >1024, user node) & tak boleh naik hak akses.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./apps/frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://trackster.dev}
+    restart: unless-stopped
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
+    depends_on:
+      - backend
+    expose:
+      - '3000'
+
+  nginx:
+    image: nginx:alpine
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+    networks:
+      - default
+      - shared-web-net
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+    entrypoint: 'sh -c ''trap exit TERM; while :; do certbot renew; sleep 12h; done'''
+
+volumes:
+  trackster_pg_data:
+  trackster_backups:
+networks:
+  shared-web-net:
+    external: true

@@ -1,0 +1,351 @@
+{
+  "checkedAt": "2026-10-13T09:12:08.749366+00:00",
+  "historical": {
+    "audit": {
+      "BIL": {
+        "currency": "USD",
+        "daily_points": 1779,
+        "duplicate_dates": 0,
+        "first": "2018-12-03",
+        "invalid_points": 0,
+        "last": "2025-12-31",
+        "monthly_points": 85,
+        "sha256": "caddbc396640d9afab1f0952c7a3d994a95e84d3fefc0d6852d000ac68f073cd",
+        "sorted_timestamps": true,
+        "url": "https://query1.finance.yahoo.com/v8/finance/chart/BIL?period1=1543622400&period2=1767225600&interval=1d"
+      },
+      "IEF": {
+        "currency": "USD",
+        "daily_points": 1779,
+        "duplicate_dates": 0,
+        "first": "2018-12-03",
+        "invalid_points": 0,
+        "last": "2025-12-31",
+        "monthly_points": 85,
+        "sha256": "8d31c34b49d402cfb60048b75c05abed5bb480e9260ebd3b8ee6e818a1f696da",
+        "sorted_timestamps": true,
+        "url": "https://query1.finance.yahoo.com/v8/finance/chart/IEF?period1=1543622400&period2=1767225600&interval=1d"
+      },
+      "VT": {
+        "currency": "USD",
+        "daily_points": 1779,
+        "duplicate_dates": 0,
+        "first": "2018-12-03",
+        "invalid_points": 0,
+        "last": "2025-12-31",
+        "monthly_points": 85,
+        "sha256": "b3182a5873fd733134767123af3b6f2d78fde935a5fdba5be46d6e5054fb814d",
+        "sorted_timestamps": true,
+        "url": "https://query1.finance.yahoo.com/v8/finance/chart/VT?period1=1543622400&period2=1767225600&interval=1d"
+      }
+    },
+    "limitations": [
+      "USD proxies, not IDR products",
+      "adjusted prices not independently reconciled",
+      "no cashflows or lot constraints",
+      "month-end drawdown understates intramonth loss",
+      "0.1% turnover cost is synthetic",
+      "no tax, FX, spread or initial purchase fee",
+      "fixed monthly rebalancing is a comparator, not proposed automatic trading",
+      "no optimality or future return claim"
+    ],
+    "results": {
+      "equal_weight": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.0691645820626592,
+          "cagr": 0.03589228057913596,
+          "max_drawdown_month_end": 0.13910179264708034,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.0004943444028801309
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.0644741798018569,
+          "cagr": 0.06068705763827964,
+          "max_drawdown_month_end": 0.13910179264708034,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0007266572403425776
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.05733496353185588,
+          "cagr": 0.09467239644786551,
+          "max_drawdown_month_end": 0.04758375954219285,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.00023231283746244646
+        },
+        "weights": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      },
+      "equity_only": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.18800433481555348,
+          "cagr": 0.09425649394975033,
+          "max_drawdown_month_end": 0.255092913299525,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.16076987564754183,
+          "cagr": 0.13954334259201828,
+          "max_drawdown_month_end": 0.255092913299525,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.1161001941876051,
+          "cagr": 0.20285460644764375,
+          "max_drawdown_month_end": 0.09692441006029529,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "weights": [
+          0,
+          0,
+          1
+        ]
+      },
+      "profile_0": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.0035084987403233383,
+          "cagr": 0.009307395991172474,
+          "max_drawdown_month_end": 0.001649097646418407,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.006095733704808076,
+          "cagr": 0.02554708407241102,
+          "max_drawdown_month_end": 0.001649097646418407,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.0018290425855143047,
+          "cagr": 0.047607185880899516,
+          "max_drawdown_month_end": 0.0,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.0
+        },
+        "weights": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "profile_1": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.028656974524944645,
+          "cagr": 0.014546227073138907,
+          "max_drawdown_month_end": 0.07087446623797167,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.0002635068315213003
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.029360337096998076,
+          "cagr": 0.03344168870498532,
+          "max_drawdown_month_end": 0.07087446623797167,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0004327572048925006
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.029155943163370324,
+          "cagr": 0.05918419703416311,
+          "max_drawdown_month_end": 0.01782324622354381,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.00016925037337120046
+        },
+        "weights": [
+          0.6190476190476191,
+          0.2857142857142857,
+          0.09523809523809525
+        ]
+      },
+      "profile_2": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.05473365370797675,
+          "cagr": 0.028347030336551837,
+          "max_drawdown_month_end": 0.11749911361258081,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.0004355506168787196
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.05228078162294344,
+          "cagr": 0.051018727527381014,
+          "max_drawdown_month_end": 0.11749911361258081,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0006572743711049945
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.04829748315659305,
+          "cagr": 0.08202707897994466,
+          "max_drawdown_month_end": 0.03839625481947062,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.00022172375422627505
+        },
+        "weights": [
+          0.41666666666666663,
+          0.33333333333333337,
+          0.25
+        ]
+      },
+      "profile_3": {
+        "early_2019_2022": {
+          "annualized_volatility": 0.10094143350170108,
+          "cagr": 0.053140344182464716,
+          "max_drawdown_month_end": 0.17494371558710142,
+          "months": 48,
+          "sum_monthly_cost_rates": 0.000539996997081483
+        },
+        "full_2019_2025": {
+          "annualized_volatility": 0.090233926397448,
+          "cagr": 0.08292509043163743,
+          "max_drawdown_month_end": 0.17494371558710142,
+          "months": 84,
+          "sum_monthly_cost_rates": 0.0007715263120271418
+        },
+        "later_2023_2025": {
+          "annualized_volatility": 0.07369314549704206,
+          "cagr": 0.12395253319043342,
+          "max_drawdown_month_end": 0.06273453042113741,
+          "months": 36,
+          "sum_monthly_cost_rates": 0.00023152931494565895
+        },
+        "weights": [
+          0.22222222222222232,
+          0.25925925925925924,
+          0.5185185185185185
+        ]
+      }
+    },
+    "status": "exploratory only"
+  },
+  "synthetic": {
+    "checks": {
+      "ai_contract": 4,
+      "allocation": 11,
+      "contribution": 17,
+      "invalid_input": 9,
+      "ledger": 2,
+      "monthly": 7,
+      "orders": 504,
+      "ranking": 27,
+      "risk": 24576,
+      "risk_monotonicity": 18432,
+      "rounding": 4007
+    },
+    "crypto_opt_in": [
+      0.2588235294117647,
+      0.24705882352941178,
+      0.45294117647058824,
+      0.0411764705882353
+    ],
+    "loss_under_unmodeled_more_severe_shock": {
+      "0": 0.0,
+      "1": 0.14761904761904762,
+      "2": 0.2833333333333333,
+      "3": 0.47962962962962963
+    },
+    "profile_cases": {
+      "0": 3900,
+      "1": 1852,
+      "2": 372,
+      "3": 20
+    },
+    "ranking_example": [
+      {
+        "asOf": 1,
+        "cost": 0.005,
+        "id": "A",
+        "score": 92.0
+      },
+      {
+        "asOf": 1,
+        "cost": 0.02,
+        "id": "B",
+        "score": 77.0
+      }
+    ],
+    "stress": {
+      "0": {
+        "adjusted": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "base": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "losses": {
+          "market": 0.0,
+          "market_and_fx": 0.0,
+          "rates": 0.0
+        }
+      },
+      "1": {
+        "adjusted": [
+          0.6190476190476191,
+          0.2857142857142857,
+          0.09523809523809525,
+          0.0
+        ],
+        "base": [
+          0.6,
+          0.3,
+          0.1,
+          0.0
+        ],
+        "losses": {
+          "market": 0.09047619047619047,
+          "market_and_fx": 0.1,
+          "rates": 0.0761904761904762
+        }
+      },
+      "2": {
+        "adjusted": [
+          0.41666666666666663,
+          0.33333333333333337,
+          0.25,
+          0.0
+        ],
+        "base": [
+          0.3,
+          0.4,
+          0.3,
+          0.0
+        ],
+        "losses": {
+          "market": 0.175,
+          "market_and_fx": 0.2,
+          "rates": 0.11666666666666668
+        }
+      },
+      "3": {
+        "adjusted": [
+          0.22222222222222232,
+          0.25925925925925924,
+          0.5185185185185185,
+          0.0
+        ],
+        "base": [
+          0.1,
+          0.3,
+          0.6,
+          0.0
+        ],
+        "losses": {
+          "market": 0.2981481481481481,
+          "market_and_fx": 0.3499999999999999,
+          "rates": 0.15555555555555556
+        }
+      }
+    },
+    "total_checks": 47596
+  },
+  "version": "invest-method-v0.1"
+}

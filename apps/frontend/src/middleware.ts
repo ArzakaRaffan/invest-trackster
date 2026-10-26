@@ -1,0 +1,38 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// '/' adalah landing page publik (marketing, deskripsi produk) — beda dari '/app' yang
+// itu dashboard privat. Exact-match, BUKAN prefix, soalnya prefix '/' bakal cocok ke semua path.
+// /split-bills/new sengaja publik juga — Split Bill bisa dibuat tanpa akun (lihat
+// SplitBillService.createPublic di backend). /split-bills/manage/* itu tempat pembuat
+// anonim ngelola bill-nya lewat ownerToken, pengganti login buat mereka.
+const PUBLIC_EXACT_PATHS = ['/', '/login', '/demo', '/savings-calculator', '/split-bills/new', '/tools', '/installment-calculator', '/trip/new', '/privacy', '/terms'];
+const PUBLIC_PATH_PREFIXES = ['/invite/', '/reset/', '/demo/', '/s/', '/split-bills/manage/', '/t/', '/trip/manage/', '/savings-calculator/']; // + gambar OG kalkulator (crawler tanpa cookie)
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_EXACT_PATHS.includes(pathname) || PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const token = request.cookies.get('trackster_jwt');
+
+  if (!token && !isPublicPath(pathname)) {
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Sudah login: nggak perlu lihat landing/login lagi, langsung ke dashboard privat.
+  if (token && (pathname === '/login' || pathname === '/')) {
+    return NextResponse.redirect(new URL('/app', request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  // Exclude any path with a file extension (icon.png, apple-icon.png, trackster-logo.svg,
+  // robots.txt, dll) selain _next/* — kalau nggak, request asset publik ikut ke-redirect ke
+  // /login buat visitor yang belum login, jadi logo/favicon rusak di landing & login page.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+};

@@ -1,0 +1,67 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PrismaModule } from './prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { BudgetModule } from './modules/budget/budget.module';
+import { TransactionModule } from './modules/transaction/transaction.module';
+import { GmailModule } from './modules/gmail/gmail.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
+import { SyncModule } from './modules/sync/sync.module';
+import { BalanceModule } from './modules/balance/balance.module';
+import { IncomeModule } from './modules/income/income.module';
+import { ReimbursementModule } from './modules/reimbursement/reimbursement.module';
+import { IncomeStreamModule } from './modules/income-stream/income-stream.module';
+import { IncomeForecastModule } from './modules/income-forecast/income-forecast.module';
+import { IncomeCheckinModule } from './modules/income-checkin/income-checkin.module';
+import { BudgetAllocationModule } from './modules/budget-allocation/budget-allocation.module';
+import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
+import { SplitBillModule } from './modules/split-bill/split-bill.module';
+import { TripModule } from './modules/trip/trip.module';
+import { AiModule } from './modules/ai/ai.module';
+import { GoalModule } from './modules/goal/goal.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ReportModule } from './modules/report/report.module';
+import { BackupModule } from './modules/backup/backup.module';
+import { ApiTokenModule } from './modules/api-token/api-token.module';
+import { IngestModule } from './modules/ingest/ingest.module';
+import { InboundModule } from './modules/inbound/inbound.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { InvestModule } from './modules/invest/invest.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    PrismaModule,
+    AuthModule,
+    BudgetModule,
+    TransactionModule,
+    GmailModule,
+    TelegramModule,
+    SyncModule,
+    BalanceModule,
+    IncomeModule,
+    ReimbursementModule,
+    IncomeStreamModule,
+    IncomeForecastModule,
+    IncomeCheckinModule,
+    BudgetAllocationModule,
+    MerchantAliasModule,
+    SplitBillModule,
+    TripModule,
+    AiModule,
+    GoalModule,
+    SubscriptionModule,
+    AnalyticsModule,
+    ReportModule,
+    BackupModule,
+    ApiTokenModule,
+    IngestModule,
+    InboundModule,
+    ProfileModule,
+    InvestModule,
+  ],
+})
+export class AppModule {}
